@@ -110,6 +110,25 @@ body::before {
   gap: 2px;
 }
 
+.brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tcc-logo-emblem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.22);
+  border-radius: 6px;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.15);
+  flex-shrink: 0;
+}
+
 .header-brand-title {
   font-size: 20px;
   font-weight: 800;
