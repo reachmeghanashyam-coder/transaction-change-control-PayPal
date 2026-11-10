@@ -1,7 +1,18 @@
-# TCC · Transaction Change Control on PayPal Rails
+# Transaction Change Control on PayPal Rails
 
 > **Autonomous Fulfillment Governance & Settlement Shield for AI Shopping Agents**  
 > *Built for the PayPal AI Hackathon 2026 (`paypalaihackathon.devpost.com`)*
+
+---
+
+### Verified Live Sandbox Execution Links for Judges
+
+> **Zero Mock Mode. Zero `SIM-` Fallbacks.** Every operation executes against live PayPal Sandbox infrastructure.
+
+* **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R)
+* **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`)
+* **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
+* **Automated Integration Test Proof:** **12 Passed, 0 Failed** via `npm test` against `api-m.sandbox.paypal.com`.
 
 ---
 
@@ -11,12 +22,15 @@ When an autonomous AI agent purchases physical goods on behalf of a user, an acu
 
 > **"An AI agent's authority to buy is never authority for a store to alter the deal."**
 
-In ecommerce fulfillment, inventory stockouts routinely lead to unapproved substitutions (e.g. buyer mandates *100% Waterproof GORE-TEX* running shoes for a wet marathon; the warehouse runs out of stock and substitutes *standard breathable mesh* at full price).
+In ecommerce fulfillment, inventory stockouts routinely lead to unapproved substitutions:
+* **Consumer Footwear ($135.00):** Buyer mandates *100% Waterproof GORE-TEX* running shoes for a wet marathon; warehouse substitutes standard breathable mesh at full price.
+* **Enterprise Hardware ($2,400.00):** Data center mandates *ECC Registered Server RAM*; distributor ships desktop non-ECC UDIMM (causing silent bit-flips and cluster crashes).
+* **Industrial MRO ($850.00):** Marine operations mandate *Grade 316 Stainless Fasteners*; warehouse ships Grade 304 zinc-coated bolts (leading to rapid saltwater corrosion).
 
 Under traditional instant-capture checkout:
-1. The store immediately captures 100% of the funds ($135.00).
+1. The store immediately captures 100% of the funds.
 2. Inferior or mismatched goods are shipped.
-3. The buyer suffers a ruined event and files a chargeback. The merchant loses the entire sale, forfeits the inventory, and pays a $20.00 dispute penalty.
+3. The buyer suffers a ruined event or hardware failure and files a chargeback. The merchant loses the entire sale, forfeits the inventory, and pays a $20.00 dispute penalty.
 
 ---
 
@@ -54,7 +68,7 @@ Before committing funds, the AI shopping agent invokes `tcc_validate_pre_purchas
 #### 2. Dual-Engine Fulfillment Audit (Gemini 3.5 Flash + Deterministic Gate)
 When the merchant's warehouse packs the order, the WMS (Shopify, ShipBob, Manhattan Associates) pushes a signed webhook (`POST /api/webhooks/fulfillment`) with HMAC-SHA256 signature verification:
 * **Sub-2ms Deterministic AST Engine:** Immediate regex/AST verification guaranteeing high-throughput and predictable SLAs under heavy warehouse loads.
-* **Gemini 3.5 Flash Extraction Layer:** Handles unstructured packing slips, thermal OCR outputs, and ambiguous line items using structured JSON schema output.
+* **Gemini 3.5 Flash Semantic Extraction Layer:** Handles unstructured packing slips, thermal OCR outputs, and ambiguous line items using structured JSON schema output.
 * **Fail-Closed Security:** If Gemini experiences high-demand spikes (HTTP 503) or OCR text is corrupted, the policy engine categorizes evidence as `UNKNOWN` and **fails closed**—the PayPal funds hold remains strictly frozen at $0.00 captured.
 
 #### 3. Sovereign Settlement & The Stockout Salvage Model
@@ -83,7 +97,7 @@ Why would merchants and PayPal adopt TCC?
 In production agentic commerce, the buyer delegates payment authority to the AI agent via **PayPal Vault v3 / Pre-Approved Billing Agreements**, allowing the agent to capture or void holds autonomously. 
 
 For sandbox evaluation, PayPal requires an interactive session approval. To ensure 100% reproducible testing by judges:
-* **Live Sandbox Order Token:** `9WM89955JF044304U` ([PayPal Approval Link](https://www.sandbox.paypal.com/checkoutnow?token=9WM89955JF044304U))
+* **Live Sandbox Order Token:** `3UD04688N2031870R` ([PayPal Approval Link](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R))
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
 
