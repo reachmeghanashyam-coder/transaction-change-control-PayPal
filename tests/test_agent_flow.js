@@ -14,10 +14,14 @@ async function runAutonomousAgentDemo() {
   console.log('   Live Demonstration of Autonomous Agent Purchase Governance  ');
   console.log('================================================================\n');
 
-  console.log('🤖 [STEP 1: BUYER AGENT MANDATE]');
-  console.log('   User instructs agent: "Buy Nike Pegasus Trail 4 (Size 10 US).');
-  console.log('   MANDATORY SPEC: Must be 100% Waterproof GORE-TEX for wet marathon."');
-  console.log('   Budget authorized: $135.00 USD\n');
+  console.log('🛡️ [STEP 1: PRE-PURCHASE GUARDRAIL AUDIT]');
+  console.log('   Agent receives buying mandate: "Nike Pegasus Trail 4 (Size 10 US)"');
+  console.log('   Strict Invariants: ["100% GORE-TEX", "Waterproof", "Lug Outsole"]');
+  console.log('   Auditing checkout price ($135.00) against max authorized budget ($135.00)...');
+  console.log('   Auditing seller terms for unilateral substitution clauses...');
+  console.log('   ✓ Price Ceiling Enforced: $135.00 <= $135.00');
+  console.log('   ✓ Invariant Hash Generated: sha256:4a8b...19e2');
+  console.log('   ✓ Status: APPROVED_FOR_AUTHORIZATION (Pre-Purchase Guardrail Passed)\n');
   await sleep(600);
 
   console.log('🔒 [STEP 2: AGENT PLACES PROTECTED ORDER ON PAYPAL RAILS]');

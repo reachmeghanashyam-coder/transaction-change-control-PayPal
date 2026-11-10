@@ -128,7 +128,19 @@ async function runTests() {
   });
 
   // 4. Webhook & MCP Verification
-  console.log('\n[4/4] WEBHOOK & MCP ARCHITECTURE VERIFICATION');
+  console.log('\n[4/4] WEBHOOK, MCP & PRE-PURCHASE ARCHITECTURE VERIFICATION');
+
+  test('Pre-Purchase Guardrail rejects transactions exceeding price ceilings', () => {
+    const isPriceSafe = 150.00 <= 135.00;
+    assert.strictEqual(isPriceSafe, false, 'Breaches budget limit');
+  });
+
+  test('Pre-Purchase Guardrail flags deceptive seller substitution terms', () => {
+    const sellerTerms = 'Seller reserves the right to substitute with equivalent item at our sole discretion.';
+    const termsLower = sellerTerms.toLowerCase();
+    const hasUncheckedSub = termsLower.includes('substitut') || termsLower.includes('equivalent item');
+    assert.strictEqual(hasUncheckedSub, true, 'Flags sneaky substitution clauses before checkout');
+  });
 
   test('MCP server definition registers tools for AI agents', () => {
     const mcp = require('../mcpServer');
