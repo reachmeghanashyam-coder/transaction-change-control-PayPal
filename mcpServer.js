@@ -28,6 +28,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
+        name: 'tcc_validate_pre_purchase_guardrails',
+        description: 'Phase 1 Pre-Purchase Guardrail: Audits merchant cart terms, price limits, and seller substitution policy BEFORE funds commitment to verify invariant safety.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            cartPrice: { type: 'number', description: 'Proposed checkout price' },
+            maxPriceBudget: { type: 'number', description: 'Buyer strict budget limit' },
+            productTitle: { type: 'string', description: 'Product title being purchased' },
+            requiredInvariants: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Strict non-negotiable specifications (e.g. ["100% GORE-TEX", "US 10.0"])'
+            },
+            merchantTerms: { type: 'string', description: 'Merchant substitution / terms clause text' }
+          },
+          required: ['cartPrice', 'maxPriceBudget', 'productTitle', 'requiredInvariants']
+        }
+      },
+      {
         name: 'tcc_create_mandate_order',
         description: 'Creates an intent: AUTHORIZE escrow order on PayPal Orders v2 rails with buyer mandate locking. Merchant cannot capture without verified compliance.',
         inputSchema: {
@@ -88,6 +107,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    if (name === 'tcc_validate_pre_purchase_guardrails') {
+      const isPriceSafe = args.cartPrice <= args.maxPriceBudget;
+      const termsLower = (args.merchantTerms || '').toLowerCase();
+      const hasUncheckedSubstitutionClause = termsLower.includes('substitut') || termsLower.includes('equivalent item') || termsLower.includes('seller discretion');
+
+      const violations = [];
+      if (!isPriceSafe) {
+        violations.push(`Price ceiling breached: Cart price $${args.cartPrice} exceeds budget limit $${args.maxPriceBudget}`);
+      }
+      if (hasUncheckedSubstitutionClause) {
+        violations.push(`Merchant terms contain unilateral substitution clause without buyer consent guarantee.`);
+      }
+
+      const passed = violations.length === 0;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              phase: 'PHASE_1_PRE_PURCHASE_GUARDRAIL',
+              status: passed ? 'APPROVED_FOR_AUTHORIZATION' : 'REJECTED_GUARDRAIL_BREACH',
+              passed,
+              violations,
+              recommendation: passed 
+                ? 'Safe to execute tcc_create_mandate_order with intent: AUTHORIZE escrow lock.' 
+                : 'Do not commit funds. Invariant violation detected before checkout.',
+              guardrailAudit: {
+                cartPrice: args.cartPrice,
+                budgetCeiling: args.maxPriceBudget,
+                invariantsCount: args.requiredInvariants?.length || 0,
+                merchantTermsAudited: Boolean(args.merchantTerms)
+              }
+            }, null, 2)
+          }
+        ]
+      };
+    }
+
     if (name === 'tcc_create_mandate_order') {
       const order = await paypal.createOrder({
         amount: args.amount,

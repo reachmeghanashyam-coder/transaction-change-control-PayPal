@@ -59,14 +59,14 @@
     <!-- ========================================== -->
     <main class="arena-stage">
       
-      <!-- TALL LEFT CARD: BUYER MANDATE -->
+      <!-- TALL LEFT CARD: BUYER MANDATE & PRE-PURCHASE GUARDRAIL -->
       <section class="tall-card card-buyer" id="nodeBuyer">
         <div class="card-top-row">
           <div>
-            <span class="node-tag">NODE 01</span>
-            <h2 class="node-heading">Buyer's Mandate</h2>
+            <span class="node-tag">PHASE 01 · PRE-PURCHASE</span>
+            <h2 class="node-heading">Agent Guardrail & Mandate</h2>
           </div>
-          <span class="node-status-pill pill-cyan">LOCKED</span>
+          <span class="node-status-pill pill-cyan">GUARDRAILS ARMED</span>
         </div>
 
         <!-- Shoe Cutout -->
@@ -121,7 +121,7 @@
               <text x="38" y="21" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800" font-size="19" fill="#FFFFFF">PayPal</text>
             </svg>
           </div>
-          <span class="gate-status-pill">ESCROW GATE</span>
+          <span class="gate-status-pill">PHASE 02 · ESCROW GATE</span>
         </div>
 
         <!-- Reactor / Money Display -->
@@ -180,12 +180,12 @@
         <span class="connector-caption" id="labelRight">FULFILLMENT FEED</span>
       </div>
 
-      <!-- TALL RIGHT CARD: WAREHOUSE DISPATCH -->
+      <!-- TALL RIGHT CARD: WAREHOUSE DISPATCH & AUDIT -->
       <section class="tall-card card-warehouse" id="nodeWarehouse">
         <div class="card-top-row">
           <div>
-            <span class="node-tag">NODE 03</span>
-            <h2 class="node-heading">Warehouse Dispatch</h2>
+            <span class="node-tag">PHASE 03 · IN-FLIGHT AUDIT</span>
+            <h2 class="node-heading">Warehouse Dispatch & Policy</h2>
           </div>
           <span class="node-status-pill pill-green" id="whStatusTag">COMPLIANT</span>
         </div>
@@ -234,24 +234,24 @@
           <span class="tl-label">EXECUTION TIMELINE</span>
         </div>
         <div class="tl-rail-chain" id="tlChain">
-          <div class="tl-node-item" id="tlStep1" onclick="jumpToStep(1)" title="Jump to Act 1: Buyer Mandate">
+          <div class="tl-node-item" id="tlStep1" onclick="jumpToStep(1)" title="Jump to Act 1: Pre-Purchase Guardrail & Mandate">
             <span class="tl-node-idx">1</span>
-            <span class="tl-node-txt">Buyer Mandate</span>
+            <span class="tl-node-txt">Pre-Purchase Guardrail</span>
           </div>
           <div class="tl-wire-segment" id="tlWire1"></div>
-          <div class="tl-node-item" id="tlStep2" onclick="jumpToStep(2)" title="Jump to Act 2: Auth Hold">
+          <div class="tl-node-item" id="tlStep2" onclick="jumpToStep(2)" title="Jump to Act 2: PayPal Auth Hold ($0 Captured)">
             <span class="tl-node-idx">2</span>
-            <span class="tl-node-txt">$135 Auth Hold</span>
+            <span class="tl-node-txt">PayPal Auth Escrow</span>
           </div>
           <div class="tl-wire-segment" id="tlWire2"></div>
-          <div class="tl-node-item" id="tlStep3" onclick="jumpToStep(3)" title="Jump to Act 3: Warehouse Event">
+          <div class="tl-node-item" id="tlStep3" onclick="jumpToStep(3)" title="Jump to Act 3: Warehouse Webhook & AI Audit">
             <span class="tl-node-idx">3</span>
-            <span class="tl-node-txt">Warehouse Event</span>
+            <span class="tl-node-txt">Fulfillment Audit</span>
           </div>
           <div class="tl-wire-segment" id="tlWire3"></div>
-          <div class="tl-node-item" id="tlStep4" onclick="jumpToStep(4)" title="Jump to Act 4: Settlement Gate">
+          <div class="tl-node-item" id="tlStep4" onclick="jumpToStep(4)" title="Jump to Act 4: Autonomous Settlement Gate">
             <span class="tl-node-idx">4</span>
-            <span class="tl-node-txt">Settlement Gate</span>
+            <span class="tl-node-txt">Settlement Enforcement</span>
           </div>
         </div>
       </div>
