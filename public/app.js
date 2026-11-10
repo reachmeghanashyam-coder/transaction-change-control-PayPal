@@ -178,25 +178,7 @@ async function switchScenario(scenarioId) {
     document.getElementById('labelRight').style.color = scDef.conduitRightColor;
     updateReplayIndicator('ACT 3 OF 4 · LIVE GEMINI 3.5 FLASH AUDIT...');
 
-    // Trigger REAL live backend webhook with Gemini 3.5 Flash
-    let liveAuditResult = null;
-    try {
-      const res = await fetch('/api/webhooks/fulfillment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slipText: scDef.slipText,
-          warehouseId: scDef.whSlipId,
-          packingSlipId: '#4092'
-        })
-      });
-      const data = await res.json();
-      liveAuditResult = data.result;
-    } catch (e) {
-      console.warn('Live webhook fetch notice:', e.message);
-    }
-
-    // ACT 5 (Reveal Warehouse Node with Live AI Extraction Data)
+    // ACT 5 (Reveal Warehouse Node immediately without waiting on network)
     const nodeWh = document.getElementById('nodeWarehouse');
     nodeWh.classList.add('node-revealed');
     if (scDef.id === 1) nodeWh.classList.add('node-compliant');
@@ -219,20 +201,31 @@ async function switchScenario(scenarioId) {
     whStatus.className = `node-status-pill ${scDef.whStatusTagClass}`;
 
     document.getElementById('whSlipId').innerText = scDef.whSlipId;
-
-    // Display REAL Gemini extraction latency & citations
-    const auditTextEl = document.getElementById('auditAnalysisText');
-    if (liveAuditResult && liveAuditResult.aiExtraction) {
-      const ai = liveAuditResult.aiExtraction;
-      auditTextEl.innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">Gemini 3.5 Flash (${ai.latencyMs}ms):</span> ${ai.attributes.riskExplanation || (scDef.id === 1 ? '✓ Verified Compliant' : '⚠️ Breach Detected')}`;
-    } else {
-      auditTextEl.innerText = scDef.auditAnalysis;
-    }
-
-    // Update PayPal comparison diff
     document.getElementById('diffPackedVal').innerHTML = scDef.diffPackedVal;
-
     updateTimelineStep(3, 'completed', scDef.tlStep3Text);
+
+    // Asynchronous Gemini Ingestion: UI never freezes, audits in background
+    const auditTextEl = document.getElementById('auditAnalysisText');
+    auditTextEl.innerHTML = '<span class="text-cyan font-mono">Auditing via Gemini 3.5 Flash...</span>';
+
+    fetch('/api/webhooks/fulfillment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slipText: scDef.slipText,
+        warehouseId: scDef.whSlipId,
+        packingSlipId: '#4092'
+      })
+    }).then(r => r.json()).then(data => {
+      if (data && data.result && data.result.aiExtraction) {
+        const ai = data.result.aiExtraction;
+        auditTextEl.innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">Gemini 3.5 Flash (${ai.latencyMs}ms):</span> ${ai.attributes.riskExplanation || (scDef.id === 1 ? '✓ Verified Compliant' : '⚠️ Breach Detected')}`;
+      } else {
+        auditTextEl.innerText = scDef.auditAnalysis;
+      }
+    }).catch(() => {
+      auditTextEl.innerText = scDef.auditAnalysis;
+    });
 
     // ACT 6: Settlement Gate enforces on PayPal Rails
     const nodePaypal = document.getElementById('nodePaypal');

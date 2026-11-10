@@ -1,19 +1,19 @@
-# TCC (Transaction Change Control) · Commercial Unit Economics & Revenue Model
+# TCC (Transaction Change Control) · Commercial Viability & Economics
 
-> **PayPal Hackathon 2026: Commercial Viability Analysis**
-> **Question for Judges:** *How does this generate revenue and save money for PayPal and merchants starting Day 1?*
+> **PayPal Hackathon 2026: Commercial Analysis**
+> **Question for Judges:** *How does this save money for PayPal and merchants starting Day 1?*
 
 ---
 
-## 1. The $100 Billion Problem: Agentic Chargebacks & Return Friction
+## 1. The Real Friction: Agentic Chargebacks & Return Costs
 
-In 2026, over **$140 Billion** in goods are projected to be purchased through autonomous AI agents (Claude Desktop, OpenAI Operator, Google Agentic Commerce).
+In autonomous commerce, shopping agents (Claude, Cursor, OpenAI Operator) place orders based on strict user constraints.
 
-However, autonomous commerce faces a catastrophic friction point:
-- **7.4% of ecommerce orders experience physical substitution or backorder changes** at fulfillment centers.
-- When an AI agent buys an item and the store ships an unverified substitute (e.g., standard mesh instead of waterproof GORE-TEX), the buyer disputes the charge.
-- **Cost to Merchant:** $15–$25 dispute fee per claim + lost inventory + return shipping costs ($12-$18) + lost customer lifetime value.
-- **Cost to PayPal:** Payment network dispute arbitration costs, customer support overhead, and chargeback network penalties.
+However, physical fulfillment introduces friction:
+- Inventory stockouts or human picking errors at warehouses lead to substitutions.
+- When an AI agent buys an item and the store ships an unverified substitute (e.g. standard mesh instead of waterproof GORE-TEX), the buyer disputes the transaction.
+- **Cost to Merchant:** Dispute arbitration fee per claim + lost inventory + return shipping costs + damaged customer trust.
+- **Cost to PayPal:** Payment network arbitration overhead and chargeback handling costs.
 
 ---
 

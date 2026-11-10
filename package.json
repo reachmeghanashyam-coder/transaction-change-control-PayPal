@@ -4,10 +4,10 @@
   "description": "Transaction Change Control - In-Flight Fulfillment Governance on PayPal Rails",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "node --no-warnings tests/test_lifecycles.js",
-    "agent:demo": "node --no-warnings tests/test_agent_flow.js",
-    "mcp": "node mcpServer.js"
+    "start": "node --use-system-ca server.js",
+    "test": "node --use-system-ca tests/test_lifecycles.js",
+    "agent:demo": "node --use-system-ca tests/test_agent_flow.js",
+    "mcp": "node --use-system-ca mcpServer.js"
   },
   "dependencies": {
     "@google/genai": "^3.0.0",

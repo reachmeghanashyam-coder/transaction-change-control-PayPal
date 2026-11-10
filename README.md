@@ -5,18 +5,18 @@
 
 ---
 
-### The Problem in Production Agentic Commerce
+### Production Context in Agentic Commerce
 
 When an autonomous AI agent purchases physical goods on behalf of a user, an acute vulnerability exists between **order checkout** and **physical warehouse dispatch**:
 
 > **An AI agent's authority to buy is never authority for a store to alter the deal.**
 
-In physical ecommerce, **7.4% of orders experience unapproved stockout substitutions** at fulfillment centers (e.g. buyer mandates *100% Waterproof GORE-TEX* running shoes for a wet marathon; the warehouse runs out of stock and silently substitutes *standard breathable mesh* at full price).
+In physical ecommerce fulfillment, inventory stockouts routinely lead to unapproved substitutions (e.g. buyer mandates *100% Waterproof GORE-TEX* running shoes for a wet marathon; the warehouse runs out of stock and substitutes *standard breathable mesh* at full price).
 
 Under traditional instant-capture checkout:
 1. The store immediately captures 100% of the funds ($135.00).
 2. Inferior or mismatched goods are shipped.
-3. The buyer suffers a ruined event, and the merchant faces a $15–$25 chargeback fee + reverse logistics costs.
+3. The buyer suffers a ruined event, and the merchant faces a dispute fee + reverse logistics costs.
 
 ---
 
