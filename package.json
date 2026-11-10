@@ -1,0 +1,17 @@
+{
+  "name": "tcc-paypal",
+  "version": "1.0.0",
+  "description": "Transaction Change Control - In-Flight Fulfillment Governance on PayPal Rails",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --no-warnings tests/test_lifecycles.js",
+    "agent:demo": "node --no-warnings tests/test_agent_flow.js",
+    "mcp": "node mcpServer.js"
+  },
+  "dependencies": {
+    "@google/genai": "^3.0.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "express": "^4.19.2"
+  }
+}

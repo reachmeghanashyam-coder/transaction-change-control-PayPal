@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TCC · Transaction Change Control on PayPal Rails</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="skeleton-app">
+    
+    <!-- ========================================== -->
+    <!-- TOP BARS (2 STACKED FULL-WIDTH ROUNDED BARS)-->
+    <!-- ========================================== -->
+    <header class="top-stack">
+      <!-- TOP BAR 1: WORLD-CLASS HEADER (BRANDING, THESIS & ENTERPRISE RAILS BADGE) -->
+      <div class="top-bar-shell bar-brand">
+        <div class="header-brand-block">
+          <h1 class="header-brand-title">TCC <span class="header-brand-sub">· Transaction Change Control</span></h1>
+          <p class="header-brand-thesis">An AI agent's authority to buy is <em>never</em> authority for a store to alter the deal.</p>
+        </div>
+        <div class="header-infrastructure-badge">
+          <span class="live-dot-pulse"></span>
+          <span class="badge-core">PAYPAL ORDERS V2 RAILS</span>
+          <span class="badge-divider">/</span>
+          <span class="badge-intent">INTENT: AUTHORIZE</span>
+        </div>
+      </div>
+
+      <!-- TOP BAR 2: SCENARIO CONTROLLER -->
+      <div class="top-bar-shell bar-scenarios">
+        <div class="sc-meta-left">
+          <span class="sc-dot"></span>
+          <span class="sc-label">TRANSACTION LIFECYCLE:</span>
+          <span class="sc-counter" id="replayIndicator">ACT 1 OF 4</span>
+        </div>
+        <div class="sc-button-group">
+          <button class="sc-pill-btn active" id="seg1" onclick="switchScenario(1)">
+            <span class="sc-num">01</span>
+            <span class="sc-name">Clean Dispatch</span>
+          </button>
+          <button class="sc-pill-btn" id="seg2" onclick="switchScenario(2)">
+            <span class="sc-num">02</span>
+            <span class="sc-name">Swap Trap</span>
+          </button>
+          <button class="sc-pill-btn" id="seg3" onclick="switchScenario(3)">
+            <span class="sc-num">03</span>
+            <span class="sc-name">$25 Offer</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- CENTER ARENA: TALL LEFT - SQUARE CENTER - TALL RIGHT -->
+    <!-- ========================================== -->
+    <main class="arena-stage">
+      
+      <!-- TALL LEFT CARD: BUYER MANDATE -->
+      <section class="tall-card card-buyer" id="nodeBuyer">
+        <div class="card-top-row">
+          <div>
+            <span class="node-tag">NODE 01</span>
+            <h2 class="node-heading">Buyer's Mandate</h2>
+          </div>
+          <span class="node-status-pill pill-cyan">LOCKED</span>
+        </div>
+
+        <!-- Shoe Cutout -->
+        <div class="shoe-cutout-wrap">
+          <div class="ambient-radial glow-cyan"></div>
+          <img src="/assets/shoe_dark_cutout.png" alt="Nike Pegasus Trail 4 GORE-TEX" class="shoe-asset" id="buyerShoeImg">
+        </div>
+
+        <!-- Product Identity -->
+        <div class="item-identity">
+          <h3 class="item-name" id="buyerItemName">Nike Pegasus Trail 4</h3>
+          <span class="item-sub" id="buyerItemSub">GORE-TEX Waterproof Edition</span>
+          <div class="item-price font-mono" id="buyerItemPrice">$135.00 <span class="price-curr">USD</span></div>
+        </div>
+
+        <div class="card-divider"></div>
+
+        <!-- Spec Rows -->
+        <div class="spec-list">
+          <div class="spec-item highlight-cyan" id="buyerSpecRow1">
+            <span class="spec-k" id="buyerSpecK1">Waterproof Membrane</span>
+            <span class="spec-v text-cyan font-semibold" id="buyerSpecV1">100% GORE-TEX Certified</span>
+          </div>
+          <div class="spec-item" id="buyerSpecRow2">
+            <span class="spec-k" id="buyerSpecK2">Sizing / Fit</span>
+            <span class="spec-v" id="buyerSpecV2">US 10.0 · Men</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-k">Contract Lock</span>
+            <span class="spec-v font-mono text-dim" id="buyerContractLock">sha256:4a8b...19e2</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONNECTOR 1: Left to Center (Clean line with terminal diamond dots) -->
+      <div class="arena-connector" id="conduitLeft">
+        <div class="connector-track-line">
+          <span class="terminal-dot dot-start"></span>
+          <div class="active-pulse" id="pulseLeft"></div>
+          <span class="terminal-dot dot-end"></span>
+        </div>
+        <span class="connector-caption" id="labelLeft">CONTRACT LOCK</span>
+      </div>
+
+      <!-- COMPACT SQUARE CENTER CARD: PAYPAL SETTLEMENT GATE -->
+      <section class="square-center-card card-paypal" id="nodePaypal">
+        <div class="paypal-header-row">
+          <div class="paypal-logo-wrap">
+            <svg class="paypal-wordmark" viewBox="0 0 100 28" fill="none">
+              <path d="M11 3h10c4.5 0 8 2.5 8 7s-3.5 7.5-8 7.5H16l-2.5 9.5H9L11 3z" fill="#003087"/>
+              <path d="M16 10h9c4 0 7 2 7 6s-3 6.5-7 6.5h-4l-2 8H14l4.5-20.5z" fill="#0079C1"/>
+              <text x="38" y="21" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800" font-size="19" fill="#FFFFFF">PayPal</text>
+            </svg>
+          </div>
+          <span class="gate-status-pill">ESCROW GATE</span>
+        </div>
+
+        <!-- Reactor / Money Display -->
+        <div class="gate-body">
+          <div class="amount-hero">
+            <span class="curr-symbol">$</span>
+            <span class="curr-val" id="vaultAmount">135.00</span>
+            <span class="curr-iso">USD</span>
+          </div>
+
+          <div class="gate-state-badge" id="vaultStateBadge">HOLD RESERVED · $0.00 CAPTURED</div>
+
+          <!-- Diff Radar -->
+          <div class="radar-box" id="policyDiffTable">
+            <div class="radar-row">
+              <span class="radar-k">Mandate:</span>
+              <span class="radar-v text-cyan font-semibold">100% GORE-TEX Waterproof ✓</span>
+            </div>
+            <div class="radar-row">
+              <span class="radar-k">Packed:</span>
+              <span class="radar-v" id="diffPackedVal">GORE-TEX Certified ✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Anchored Action Zone (Zero Layout Shifts) -->
+        <div class="gate-actions-fixed" id="vaultActionDock">
+          <div class="note-state" id="stateNoteDefault">
+            <span class="note-shield">🛡️</span>
+            <span id="vaultSubtext">PayPal Orders v2 · intent: AUTHORIZE active. Merchant cannot capture without compliance.</span>
+          </div>
+
+          <div class="action-btn-row" id="buyerBtnRow" style="display: none;">
+            <button class="btn-gate btn-void" id="btnVoid" onclick="triggerVoidAction()">
+              <span>Reject & Void ($0.00)</span>
+            </button>
+            <button class="btn-gate btn-accept" id="btnAcceptDiscount" onclick="triggerDiscountCapture()" style="display: none;">
+              <span>Accept Mesh for $110.00</span>
+            </button>
+          </div>
+
+          <div class="receipt-pill" id="miniReceipt" style="display: none;">
+            <span class="text-green font-semibold">✓ SETTLEMENT:</span>
+            <span class="font-mono text-dim" id="miniReceiptText">VOID CONFIRMED</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONNECTOR 2: Center to Right -->
+      <div class="arena-connector" id="conduitRight">
+        <div class="connector-track-line">
+          <span class="terminal-dot dot-start"></span>
+          <div class="active-pulse" id="pulseRight"></div>
+          <span class="terminal-dot dot-end"></span>
+        </div>
+        <span class="connector-caption" id="labelRight">FULFILLMENT FEED</span>
+      </div>
+
+      <!-- TALL RIGHT CARD: WAREHOUSE DISPATCH -->
+      <section class="tall-card card-warehouse" id="nodeWarehouse">
+        <div class="card-top-row">
+          <div>
+            <span class="node-tag">NODE 03</span>
+            <h2 class="node-heading">Warehouse Dispatch</h2>
+          </div>
+          <span class="node-status-pill pill-green" id="whStatusTag">COMPLIANT</span>
+        </div>
+
+        <!-- Shoe Cutout -->
+        <div class="shoe-cutout-wrap">
+          <div class="ambient-radial glow-green" id="whGlow"></div>
+          <img src="/assets/shoe_dark_cutout.png" alt="Warehouse Dispatched Sneaker" class="shoe-asset" id="whShoeImg">
+        </div>
+
+        <!-- Product Identity -->
+        <div class="item-identity">
+          <h3 class="item-name" id="whProductName">Nike Pegasus Trail 4</h3>
+          <span class="item-sub" id="whSubSku">GORE-TEX Waterproof Edition</span>
+          <div class="item-price font-mono" id="whPriceVal">$135.00 <span class="price-curr">USD</span></div>
+        </div>
+
+        <div class="card-divider"></div>
+
+        <!-- Spec Rows -->
+        <div class="spec-list">
+          <div class="spec-item" id="whSpecRow">
+            <span class="spec-k">Dispatched Upper</span>
+            <span class="spec-v text-green font-semibold" id="whBadgeText">100% GORE-TEX Membrane</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-k">Packing Slip ID</span>
+            <span class="spec-v font-mono" id="whSlipId">#4092 · SneakerDepot NYC</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-k">AI Audit Result</span>
+            <span class="spec-v font-semibold text-green" id="auditAnalysisText">✓ 100% Compliant · No Downgrade</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- BOTTOM BARS (2 STACKED FULL-WIDTH ROUNDED BARS)-->
+    <!-- ========================================== -->
+    <footer class="bottom-stack">
+      <!-- BOTTOM BAR 1: EXECUTION TIMELINE -->
+      <div class="bottom-bar-shell bar-timeline">
+        <div class="tl-label-group">
+          <span class="tl-pulse-dot"></span>
+          <span class="tl-label">EXECUTION TIMELINE</span>
+        </div>
+        <div class="tl-rail-chain" id="tlChain">
+          <div class="tl-node-item" id="tlStep1" onclick="jumpToStep(1)" title="Jump to Act 1: Buyer Mandate">
+            <span class="tl-node-idx">1</span>
+            <span class="tl-node-txt">Buyer Mandate</span>
+          </div>
+          <div class="tl-wire-segment" id="tlWire1"></div>
+          <div class="tl-node-item" id="tlStep2" onclick="jumpToStep(2)" title="Jump to Act 2: Auth Hold">
+            <span class="tl-node-idx">2</span>
+            <span class="tl-node-txt">$135 Auth Hold</span>
+          </div>
+          <div class="tl-wire-segment" id="tlWire2"></div>
+          <div class="tl-node-item" id="tlStep3" onclick="jumpToStep(3)" title="Jump to Act 3: Warehouse Event">
+            <span class="tl-node-idx">3</span>
+            <span class="tl-node-txt">Warehouse Event</span>
+          </div>
+          <div class="tl-wire-segment" id="tlWire3"></div>
+          <div class="tl-node-item" id="tlStep4" onclick="jumpToStep(4)" title="Jump to Act 4: Settlement Gate">
+            <span class="tl-node-idx">4</span>
+            <span class="tl-node-txt">Settlement Gate</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM BAR 2: JUDGE EVIDENCE VAULT -->
+      <div class="bottom-bar-shell bar-evidence" id="proofDrawer">
+        <div class="evidence-toggle-row" onclick="toggleProofDrawer()">
+          <div class="ev-left">
+            <span class="ev-shield">🛡️</span>
+            <span class="ev-title">JUDGE EVIDENCE VAULT · LIVE PAYPAL REST API ARTIFACTS</span>
+          </div>
+          <div class="ev-right">
+            <span class="ev-badge">9/9 TESTS PASSING</span>
+            <span class="ev-arrow" id="drawerArrow">▲</span>
+          </div>
+        </div>
+        <div class="evidence-body" id="drawerBody">
+          <div class="evidence-grid">
+            <div class="ev-card">
+              <span class="ev-k">PAYPAL ORDER ID</span>
+              <span class="ev-v font-mono">36S14862Y66466816</span>
+              <span class="ev-sub">Orders v2 · intent: AUTHORIZE</span>
+            </div>
+            <div class="ev-card">
+              <span class="ev-k">AUTHORIZATION ID</span>
+              <span class="ev-v font-mono" id="proofAuthId">7VU467051N1536501</span>
+              <span class="ev-sub">api-m.sandbox.paypal.com</span>
+            </div>
+            <div class="ev-card">
+              <span class="ev-k">PAYPAL RAILS STATUS</span>
+              <span class="ev-v" id="proofStateText"><span class="text-green font-semibold">CAPTURED</span></span>
+              <span class="ev-sub">Synchronized with ledger</span>
+            </div>
+            <div class="ev-card">
+              <span class="ev-k">CAPTURED AMOUNT</span>
+              <span class="ev-v font-mono" id="proofCapturedVal">$135.00</span>
+              <span class="ev-sub">Retained balance: $0.00</span>
+            </div>
+            <div class="ev-card">
+              <span class="ev-k">AI AUDITOR</span>
+              <span class="ev-v">Gemini 1.5 Flash</span>
+              <span class="ev-sub">Structured JSON schema</span>
+            </div>
+            <div class="ev-card">
+              <span class="ev-k">TEST SUITE</span>
+              <span class="ev-v font-mono text-green">npm test (9/9 passing)</span>
+              <span class="ev-sub">B2C Footwear · B2B RAM · Industrial MRO</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js?v=2.1"></script>
+</body>
+</html>

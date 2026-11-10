@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tcc-paypal-rails": {
+      "command": "node",
+      "args": ["C:\\Users\\ghanashyam\\.gemini\\antigravity\\scratch\\tcc-paypal\\mcpServer.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
