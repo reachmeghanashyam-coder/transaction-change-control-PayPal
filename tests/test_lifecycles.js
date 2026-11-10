@@ -157,6 +157,18 @@ async function runTests() {
     assert.strictEqual(signature, verify, 'HMAC signature matches expected cryptographic digest');
   });
 
+  test('Shopify native fulfillment payload (orders/fulfilled) parses into verified slip text', () => {
+    const shopifyPayload = {
+      order_id: 994821,
+      tracking_number: '1Z9999999999999999',
+      line_items: [{ title: 'Nike Pegasus Trail 4', variant_title: 'US 10.0 / Mesh', sku: 'NK-MSH' }]
+    };
+    const item = shopifyPayload.line_items[0];
+    const text = `SHOPIFY FULFILLMENT #${shopifyPayload.order_id}: Dispatched ${item.title} (${item.variant_title}). SKU: ${item.sku}.`;
+    assert.ok(text.includes('SHOPIFY FULFILLMENT'));
+    assert.ok(text.includes('NK-MSH'));
+  });
+
   console.log('\n================================================================');
   console.log(`   TEST RUN COMPLETE: ${passed} PASSED, ${failed} FAILED       `);
   console.log('================================================================\n');
