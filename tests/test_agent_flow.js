@@ -79,6 +79,10 @@ async function runAutonomousAgentDemo() {
   console.log('================================================================');
   console.log('   DEMO COMPLETE: 100% REAL PAYPAL REST V2 RAILS VERIFIED       ');
   console.log('================================================================\n');
+
+  const gatewayUrl = process.env.BASE_URL || 'http://localhost:3000';
+  console.log('🌐 [LIVE OBSERVABILITY GATEWAY]:');
+  console.log(`   Interactive Spatial Settlement Cockpit: ${gatewayUrl}\n`);
 }
 
 runAutonomousAgentDemo().catch(err => {
