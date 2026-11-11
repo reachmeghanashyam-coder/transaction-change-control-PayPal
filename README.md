@@ -1,86 +1,93 @@
-# Transaction Change Control on PayPal Rails
+# Transaction Change Control (TCC) on PayPal
 
-> **Autonomous Fulfillment Governance & Settlement Policy Layer for AI Shopping Agents**  
-> *Built for the PayPal AI Hackathon 2026 (`paypalaihackathon.devpost.com`)*
+> **Fulfillment verification and settlement control for AI shopping agents.**  
+> Built for the PayPal AI Hackathon 2026 (`paypalaihackathon.devpost.com`).
 
 ---
 
-### Verified Live Sandbox Execution Links for Judges
-
-> **Zero Mock Mode. Zero `SIM-` Fallbacks.** Every operation executes against live PayPal Sandbox infrastructure.
+## Live Sandbox Execution & Verification
 
 * **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R)
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`, verified on `api-m.sandbox.paypal.com`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
-* **Automated Integration Test Proof:** **13 Passed, 0 Failed** via `npm test` against `api-m.sandbox.paypal.com`.
+* **Automated Test Suite:** **13 Passed, 0 Failed** via `npm test` (includes both live PayPal Sandbox API calls and deterministic policy verification).
 
 ---
 
-### The Problem in Agentic Commerce
+## The Problem
 
-When an autonomous AI agent purchases physical goods on behalf of a user, an acute vulnerability exists between **order checkout** and **physical warehouse dispatch**:
+AI shopping agents can be authorized to purchase a specific product at an agreed price. But what happens when the merchant's warehouse substitutes that product before shipping?
 
-> **"An AI agent's authority to buy is never authority for a store to alter the deal."**
+Consider a simple example:
 
-In ecommerce fulfillment, inventory stockouts routinely lead to unilateral substitutions:
-* **Consumer Footwear ($135.00):** Buyer mandates *100% Waterproof GORE-TEX* running shoes for a wet marathon; warehouse substitutes standard breathable mesh at full price.
-* **Enterprise Hardware ($2,400.00):** Data center mandates *ECC Registered Server RAM*; distributor ships desktop non-ECC UDIMM (causing silent bit-flips and cluster crashes).
-* **Industrial MRO ($850.00):** Marine operations mandate *Grade 316 Stainless Fasteners*; warehouse ships Grade 304 zinc-coated bolts (leading to rapid saltwater corrosion).
+A buyer asks an agent to purchase Nike Pegasus Trail 4 GORE-TEX shoes for $135. The warehouse runs out of stock and packs the standard mesh version instead.
 
-Under traditional instant-capture checkout:
+The merchant has changed an important part of the deal, but the payment may already have been captured. Under traditional checkout:
 1. The store immediately captures 100% of the funds.
 2. Inferior or mismatched goods are shipped.
-3. The buyer suffers a ruined event or hardware failure and files an adversarial chargeback. The merchant loses the entire sale, forfeits the inventory, and pays a $20.00 dispute penalty.
+3. The buyer files an adversarial chargeback. The merchant loses the entire sale, forfeits the inventory, and pays dispute fees.
+
+TCC addresses this gap.
+
+> **An agent's authority to buy is not permission for a merchant to change what the buyer agreed to purchase.**
 
 ---
 
-### How TCC Leverages PayPal's Native Primitives
+## What TCC Does
 
-Traditional card rails and instant-capture checkout provide zero in-flight contractual verification. PayPal natively provides two foundational payment primitives: **`intent: AUTHORIZE`** (creating an authorized payment hold) and **`CAPTURE` / `VOID`** (settling or releasing that hold).
+PayPal already provides the payment authorization and settlement primitives (`intent: AUTHORIZE`, `CAPTURE`, and `VOID`). TCC adds the missing fulfillment-dependent decision layer between authorization and capture.
 
-TCC introduces an **in-flight fulfillment governance and settlement policy engine** directly between authorization and capture:
+1. **Before purchase:** The agent validates the buyer's budget and product requirements, then creates a PayPal Orders v2 order using `intent: AUTHORIZE`.
+2. **During fulfillment:** TCC receives signed warehouse fulfillment documents (such as packing slips and advanced shipping notices) and checks the declared product against the buyer's original requirements.
+3. **Before settlement:** TCC applies deterministic policies to the verification result. A matching item proceeds to capture. A mismatch can trigger an immediate void, while an alternative requires explicit buyer approval before capturing a discounted amount.
+
+The goal is straightforward: prevent an AI agent from settling a transaction for goods that don't match the buyer's agreed requirements.
+
+---
+
+## How TCC Works
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
-│                           THE COMPLETE DUAL-LOCK PIPELINE                                   │
+│                                   THE TCC PIPELINE                                          │
 ├────────────────────────────────┬────────────────────────────┬───────────────────────────────┤
 │    PHASE 1: PRE-PURCHASE       │   PHASE 2: IN-FLIGHT       │     PHASE 3: POST-AUDIT       │
 │      (Mandate & Auth Hold)     │    (Fulfillment Audit)     │     (Governed Settlement)     │
 ├────────────────────────────────┼────────────────────────────┼───────────────────────────────┤
-│ • Agent Mandate Binding        │ • Merchant Inbound Webhook │ • Verified Match -> CAPTURE   │
-│ • Price & Spec Invariant Lock  │ • Gemini 3.5 Flash ASN OCR │ • Spec Breach    -> VOID      │
+│ • Agent Mandate Binding        │ • Inbound Webhook Event    │ • Verified Match -> CAPTURE   │
+│ • Budget Ceiling Enforcement   │ • Gemini 3.5 Flash Parsing │ • Spec Breach    -> VOID      │
 │ • PayPal intent: AUTHORIZE     │ • Deterministic Policy Gate│ • Buyer Amendment-> PARTIAL   │
-│ • Hold $135.00 · Capture $0.00 │ • Fail-Closed State Engine │ • Dispute-Risk Reduction      │
+│ • Hold $135.00 · Capture $0.00 │ • Fail-Closed Decision     │ • Dispute-Risk Reduction      │
 └────────────────────────────────┴────────────────────────────┴───────────────────────────────┘
 ```
 
 ---
 
-### The 3 Core Architectural Innovations
+## Three Key Capabilities
 
-#### 1. Phase 1: Pre-Purchase Guardrail & Mandate Binding
-Before committing funds, the AI shopping agent invokes `tcc_validate_pre_purchase_guardrails` over the official Model Context Protocol (MCP) or `POST /api/guardrails/pre-purchase`:
-* **Budget Ceiling Enforcement:** Prevents checkout price overruns.
-* **Deceptive Seller Clause Detection:** Flags clauses in merchant terms that claim unilateral rights to substitute goods without consent.
-* **Invariant Lock:** Binds non-negotiable specifications (e.g. `100% GORE-TEX`) to a cryptographic SHA-256 hash.
-* **PayPal Authorization Hold:** Places the order via PayPal Orders v2 with `intent: "AUTHORIZE"`. Funds are authorized on the buyer's payment method, but **$0.00 is captured**.
+### 1. Pre-Purchase Guardrail & Mandate Binding
+Before committing funds, the AI shopping agent invokes `POST /api/guardrails/pre-purchase` (or via Model Context Protocol):
+* **Budget Ceiling Enforcement:** Validates checkout price against authorized budget limits.
+* **Seller Term Auditing:** Flags clauses in merchant terms that claim unilateral rights to substitute goods without consent.
+* **Invariant Lock:** Binds non-negotiable specifications (e.g. `100% GORE-TEX`) to a SHA-256 hash.
+* **PayPal Authorization Hold:** Initiates the order via PayPal Orders v2 with `intent: "AUTHORIZE"`. Funds are reserved on the buyer's payment method, but **$0.00 is captured**.
 
-#### 2. Dual-Engine Fulfillment Audit (Gemini 3.5 Flash + Deterministic Gate)
-When the merchant's warehouse packs the order, the WMS (Shopify, ShipBob, Manhattan Associates) pushes a signed webhook (`POST /api/webhooks/fulfillment`) with HMAC-SHA256 signature verification:
-* **Sub-2ms Deterministic AST Engine:** Immediate regex/AST verification guaranteeing high-throughput and predictable SLAs under heavy warehouse loads.
-* **Gemini 3.5 Flash Semantic Extraction Layer:** Handles unstructured packing slips, thermal OCR outputs, and ambiguous line items using structured JSON schema output.
-* **Fail-Closed Security:** If Gemini experiences high-demand spikes (HTTP 503) or OCR text is corrupted, the policy engine categorizes evidence as `UNKNOWN` and **fails closed**—the PayPal authorization hold remains strictly uncaptured at $0.00.
+### 2. Fulfillment Evidence Verification
+When the warehouse packs the order, the system receives a signed webhook (`POST /api/webhooks/fulfillment`) compatible with Shopify (`orders/fulfilled`) and ShipBob (`order.shipment.packed`) schemas:
+* **Deterministic AST Engine:** Immediate regex and schema verification checking structured line items and SKU invariants.
+* **Gemini 3.5 Flash Extraction Layer:** Parses unstructured packing slips, thermal printer outputs, and ambiguous descriptions into a structured JSON schema.
+* **Fail-Closed Security:** If the AI model is unavailable or evidence is conflicting, the policy engine marks evidence as `UNKNOWN` and **fails closed**—the PayPal authorization hold remains strictly uncaptured.
 
-#### 3. Governed Settlement & The Stockout Salvage Model
+### 3. Governed Settlement
 When a substitution or spec breach occurs:
-* **Option A: Instant Reject & Void ($0.00 Captured):** Calls PayPal REST v2 `/v2/payments/authorizations/{id}/void`. Authorizations are voided cleanly on the PayPal ledger—zero chargeback fees, zero dispute filings.
-* **Option B: Buyer-Consented Partial Settlement ($110.00 Capture):** If the buyer explicitly agrees to accept the downgraded item for a discount, TCC calls PayPal REST v2 `/v2/payments/authorizations/{id}/capture` with `amount: "110.00"` and `final_capture: true`. This captures the agreed amount and automatically releases the remaining $25.00 authorization hold back to the buyer's balance.
+* **Option A: Instant Void ($0.00 Captured):** Calls PayPal REST v2 `/v2/payments/authorizations/{id}/void`. The authorization is canceled on the PayPal ledger with zero chargeback fees.
+* **Option B: Buyer-Consented Partial Settlement ($110.00 Capture):** If the buyer explicitly consents to accept the alternative item for a discount, TCC calls PayPal REST v2 `/v2/payments/authorizations/{id}/capture` with `amount: "110.00"` and `final_capture: true`. PayPal settles the agreed amount and automatically terminates the remaining $25.00 authorization reserve.
 
 ---
 
-### Illustrative Economic Model: Dispute Reduction & Stockout Salvage
+## Why Merchants Might Use TCC
 
-> **Disclaimer:** The figures below represent an illustrative unit-economics scenario for a retail merchant experiencing frequent stockouts, comparing instant capture with TCC governed settlement.
+> **Illustrative Unit-Economics Model:** Comparing standard instant capture with TCC governed settlement for a retailer experiencing frequent inventory stockouts.
 
 | Metric | Traditional Instant Capture | With TCC on PayPal Rails | Merchant Impact |
 | :--- | :--- | :--- | :--- |
@@ -92,66 +99,46 @@ When a substitution or spec breach occurs:
 
 ---
 
-### Architectural Boundaries & Disclosures (Judge Transparency)
+## What the System Does and Doesn't Do
 
-In accordance with institutional engineering rigor, we explicitly disclose the boundaries of the system:
+In the interest of technical accuracy and judge transparency, here are the system's exact boundaries:
 
-1. **Evidence-Based Fulfillment Audit vs. Physical Inspection:**  
-   TCC audits **inbound, HMAC-signed fulfillment documents** (packing slips, WMS shipment notifications, advanced shipping notices). It verifies that the merchant's declared fulfillment documentation complies with the buyer's invariant mandate before payment capture. It does not perform physical inspection of sealed parcels.
+1. **Document Verification vs. Physical Inspection:**  
+   TCC audits **inbound, signed fulfillment documents** (packing slips, WMS shipment notifications, advanced shipping notices). It verifies that the merchant's declared fulfillment documentation matches the buyer's purchase invariants before payment capture. It does not physically inspect parcels.
 2. **PayPal Authorization Holds vs. Legal Escrow:**  
    PayPal's `intent: AUTHORIZE` creates a payment authorization hold. In PayPal's API, authorizations have a 3-day honor window and up to a 29-day capture window. It is not an independent third-party legal escrow trust account, but a native payment authorization hold.
 3. **Sandbox Manual Payer Authentication:**  
-   In PayPal Orders v2 Sandbox, orders created with `intent: AUTHORIZE` require interactive payer approval via `approveLink` before becoming capture-eligible authorizations. In a production enterprise AI agent deployment, payer authority is pre-delegated via **PayPal Vault v3 / Pre-Approved Billing Agreements**, allowing the agent to capture or void holds autonomously without interactive prompts.
+   In PayPal Orders v2 Sandbox, orders created with `intent: AUTHORIZE` require interactive payer approval via `approveLink` before becoming capture-eligible authorizations. In a production enterprise AI agent deployment, payer authority would be pre-delegated via **PayPal Vault v3 / Billing Agreements**, allowing the agent to capture or void holds autonomously.
 4. **Partial Capture Mechanics:**  
    In PayPal REST v2, partial captures do not initiate an outbound refund transaction. When capturing $110.00 with `final_capture: true`, PayPal settles $110.00 and terminates the remaining $25.00 authorization reserve, ensuring the buyer is never billed for the uncaptured $25.00.
 
 ---
 
-### Tech Stack & Multi-Client Protocols
+## Run It Yourself (Local & Live)
 
-* **Autonomous Agent Interfaces:**
-  * **OpenAPI 3.1 Specification** (`/openapi.json` & `/docs`) for AI Agents & Custom GPT Actions ([Setup Guide](CHATGPT_ACTION_GUIDE.md)).
-  * **Model Context Protocol (MCP)** (`@modelcontextprotocol/sdk`) for Claude Desktop, Cursor, and IDE coding agents.
-  * **Autonomous Agent CLI:** `npm run agent:demo` executes full 5-act agent purchasing lifecycle against live PayPal rails.
-* **Financial Rails:** PayPal REST v2 API (`/v2/checkout/orders`, `/v2/payments/authorizations`) with `intent: AUTHORIZE`.
-* **AI Extraction Engine:** Google Gemini 3.5 Flash (`@google/genai`) with 3-tier resilient deterministic failover.
-* **WMS Webhook Ingestion:** Native Shopify (`orders/fulfilled`) & ShipBob (`order.shipment.packed`) HMAC-SHA256 signature verification.
-* **Backend:** Node.js, Express, Server-Sent Events (SSE).
-* **Test Suite:** Zero-dependency automated test runner (`tests/test_lifecycles.js`) — **13 passing integration tests**.
-
----
-
-### Verification & Reproduction in Under 60 Seconds (Stranger Test)
-
-Any judge or developer can verify all claims locally or against our live deployment:
+Any judge or developer can verify the system in under 60 seconds:
 
 ```bash
-# 1. Run Automated Test Suite (13/13 Passing on PayPal Sandbox)
+# 1. Run Automated Test Suite
 npm test
+# Output: 13 Passed (3 live PayPal Sandbox API tests + 10 deterministic policy tests)
 
-# 2. Run Autonomous AI Agent CLI (Executes Pre-Purchase Guardrails, PayPal Orders v2 Auth Hold, WMS Audit & Void)
+# 2. Run Autonomous AI Agent CLI Demonstration
 npm run agent:demo
+# Executes the 5-step agent purchasing lifecycle against live PayPal rails
 
-# 3. View Live Spatial Financial Cockpit (Hosted on Cloud Container)
+# 3. View Live Cockpit (Hosted on Render)
 # https://tcc-paypal.onrender.com
 ```
 
 ---
 
-### Optional: Enterprise Agent Integration (ChatGPT / Claude / MCP)
+## Protocols & Interfaces
 
-For judges running external AI agent environments:
-* **ChatGPT Custom GPT Action:** Point any OpenAPI-compatible client to `https://tcc-paypal.onrender.com/openapi.json` ([Detailed Instructions](CHATGPT_ACTION_GUIDE.md)).
-* **MCP Stdio Server:** `node mcpServer.js` exposes 4 core settlement tools to any Model Context Protocol host.
-
-```bash
-# Launch MCP Server for Claude Desktop / Cursor
-npm run mcp
-
-# Launch Local Interactive Spatial Cockpit
-npm start
-# Cockpit:  http://localhost:3000
-# OpenAPI:  http://localhost:3000/openapi.json
-# Swagger:  http://localhost:3000/docs
-# Health:   http://localhost:3000/health
-```
+* **Autonomous Agent Interfaces:**
+  * **OpenAPI 3.1 Specification** (`/openapi.json` & `/docs`) for AI Agents & Custom GPT Actions ([Setup Guide](CHATGPT_ACTION_GUIDE.md)).
+  * **Model Context Protocol (MCP)** (`@modelcontextprotocol/sdk`) for Claude Desktop, Cursor, and IDE coding agents (`npm run mcp`).
+* **Financial Rails:** PayPal REST v2 API (`/v2/checkout/orders`, `/v2/payments/authorizations`) with `intent: AUTHORIZE`.
+* **AI Extraction Engine:** Google Gemini 3.5 Flash (`@google/genai`) with 3-tier resilient deterministic failover.
+* **Webhook Ingestion:** Compatible with Shopify (`orders/fulfilled`) and ShipBob (`order.shipment.packed`) schemas with HMAC-SHA256 signature verification.
+* **Backend:** Node.js, Express, Server-Sent Events (SSE).
