@@ -190,70 +190,10 @@ body::before {
 .badge-divider { color: var(--text-dim); }
 .badge-intent { color: var(--accent-cyan); font-weight: 700; }
 
-/* Top Bar 2: Scenarios & Agent Prompt Bar */
+/* Top Bar 2: Scenarios Centered */
 .bar-scenarios {
-  height: 48px;
-}
-
-.agent-prompt-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  max-width: 620px;
-}
-
-.agent-icon-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--accent-cyan);
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-
-.agent-input-field {
-  flex: 1;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: #FFFFFF;
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.agent-input-field:focus {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.15);
-}
-
-.agent-dispatch-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(135deg, #0079C1 0%, #00457C 100%);
-  border: 1px solid rgba(0, 242, 254, 0.4);
-  color: #FFFFFF;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s var(--ease-spring);
-}
-
-.agent-dispatch-btn:hover {
-  background: linear-gradient(135deg, #00F2FE 0%, #0079C1 100%);
-  color: #050B14;
-  box-shadow: 0 0 12px rgba(0, 242, 254, 0.3);
+  height: 42px;
+  justify-content: center;
 }
 
 .sc-button-group {
