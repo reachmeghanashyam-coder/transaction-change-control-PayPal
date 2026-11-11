@@ -45,12 +45,23 @@
         </div>
       </div>
 
-      <!-- TOP BAR 2: SCENARIO CONTROLLER -->
+      <!-- TOP BAR 2: AGENT CONSOLE & SCENARIO CONTROLLER -->
       <div class="top-bar-shell bar-scenarios">
-        <div class="sc-meta-left">
-          <span class="sc-dot"></span>
-          <span class="sc-label">TRANSACTION LIFECYCLE:</span>
-          <span class="sc-counter" id="replayIndicator">ACT 1 OF 4</span>
+        <div class="agent-prompt-bar">
+          <div class="agent-icon-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="#00F2FE" stroke-width="2"/>
+              <path d="M12 6V12L16 14" stroke="#10B981" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>SHOPPING AGENT:</span>
+          </div>
+          <input type="text" id="agentInput" class="agent-input-field" value="Buy Nike Pegasus Trail 4 (Size 10 US) 100% GORE-TEX under $135" />
+          <button id="agentDispatchBtn" class="agent-dispatch-btn" onclick="dispatchAgentOrder()">
+            <span class="btn-text">DISPATCH MANDATE</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
         <div class="sc-button-group">
           <button class="sc-pill-btn active" id="seg1" onclick="switchScenario(1)">

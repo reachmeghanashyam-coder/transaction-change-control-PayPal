@@ -420,3 +420,49 @@ function toggleProofDrawer() {
 window.addEventListener('load', () => {
   switchScenario(1);
 });
+
+
+// Interactive Shopping Agent Dispatcher (Option B Native Integration)
+async function dispatchAgentOrder() {
+  const input = document.getElementById('agentInput');
+  const btn = document.getElementById('agentDispatchBtn');
+  const query = input.value.trim();
+  if (!query) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span>DISPATCHING...</span>';
+
+  try {
+    const res = await fetch('/api/orders/create-mandate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: '135.00',
+        product: 'Nike Pegasus Trail 4 (Size 10 US) 100% GORE-TEX',
+        mandateText: 'Size 10 US, 100% Waterproof GORE-TEX only, Zero Substitutions Allowed',
+        agentId: 'browser-shopping-agent'
+      })
+    });
+
+    const data = await res.json();
+    btn.disabled = false;
+    btn.innerHTML = '<span class="btn-text">DISPATCH MANDATE</span>';
+
+    if (data.orderId) {
+      switchScenario(1);
+      const badge = document.getElementById('vaultStateBadge');
+      if (badge) badge.innerText = `HOLD ARMED · PAYPAL ID: ${data.orderId.substring(0, 10)}...`;
+
+      const orderEl = document.getElementById('proofOrderId');
+      if (orderEl) orderEl.innerText = data.orderId;
+
+      alert(`TCC Shopping Agent Dispatched Order on PayPal Rails!\n\nOrder ID: ${data.orderId}\nIntent: ${data.intent} (Escrow Hold)\nAmount: $${data.mandate.amount} USD\nApproval URL: ${data.approveLink}\n\nFunds remain on reserve until warehouse packing slip audit passes!`);
+    } else {
+      alert('Order response: ' + JSON.stringify(data));
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="btn-text">DISPATCH MANDATE</span>';
+    alert('Failed to dispatch mandate: ' + err.message);
+  }
+}
