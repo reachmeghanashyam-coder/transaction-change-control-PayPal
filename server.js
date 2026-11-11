@@ -341,9 +341,13 @@ app.post('/api/orders/settle-action', async (req, res) => {
 
   if (action === 'VOID') {
     let httpStatus = 204;
+    let isAlreadyVoided = false;
     try {
       const v = await paypal.voidAuthorization(authId);
       httpStatus = v.status;
+      if (v.status === 422 && v.raw?.details?.[0]?.issue === 'PREVIOUSLY_VOIDED') {
+        isAlreadyVoided = true;
+      }
     } catch (e) {
       console.log('[SETTLE NOTICE] Void call status check:', e.message);
     }
@@ -352,9 +356,13 @@ app.post('/api/orders/settle-action', async (req, res) => {
     order.heldAmount = '0.00';
     order.capturedAmount = '0.00';
 
+    const receiptMsg = isAlreadyVoided
+      ? `Authorization \`${authId}\` verified as VOIDED on PayPal Sandbox ledger. Zero dollars captured ($0.00).`
+      : `Authorization \`${authId}\` VOIDED on PayPal Sandbox (HTTP ${httpStatus}). Zero dollars captured ($0.00).`;
+
     const result = {
       success: true,
-      receipt: `Authorization \`${authId}\` VOIDED on PayPal Sandbox (HTTP ${httpStatus}). Zero dollars captured ($0.00).`,
+      receipt: receiptMsg,
       ledger: {
         heldAmount: '0.00',
         capturedAmount: '0.00',
