@@ -1,0 +1,166 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Transaction Change Control on PayPal Rails",
+    "description": "Autonomous Fulfillment Governance & Settlement Shield for AI Shopping Agents. Binds purchase mandates to delayed capture authorization holds on PayPal Orders v2 rails, audits warehouse dispatch against non-negotiable invariants, and enforces autonomous settlement.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://tcc-paypal.onrender.com",
+      "description": "Live Production Gateway (Render)"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Development Gateway"
+    }
+  ],
+  "paths": {
+    "/api/guardrails/pre-purchase": {
+      "post": {
+        "operationId": "validatePrePurchaseGuardrails",
+        "summary": "Phase 1: Validate Pre-Purchase Guardrails & Invariant Rules",
+        "description": "Audits checkout price against strict user budget, detects unilateral merchant substitution clauses, and binds invariants to cryptographic proof before funds commitment.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["cartPrice", "maxPriceBudget", "productTitle", "requiredInvariants"],
+                "properties": {
+                  "cartPrice": { "type": "number", "example": 135.00 },
+                  "maxPriceBudget": { "type": "number", "example": 135.00 },
+                  "productTitle": { "type": "string", "example": "Nike Pegasus Trail 4" },
+                  "requiredInvariants": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "example": ["100% GORE-TEX Waterproof", "Size US 10.0"]
+                  },
+                  "merchantTerms": {
+                    "type": "string",
+                    "example": "Standard retail terms with full fulfillment guarantee."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pre-purchase evaluation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "phase": { "type": "string" },
+                    "status": { "type": "string" },
+                    "passed": { "type": "boolean" },
+                    "recommendation": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/create-mandate": {
+      "post": {
+        "operationId": "createMandateOrder",
+        "summary": "Phase 1: Create Delayed Capture Order on PayPal Rails",
+        "description": "Initiates an order on PayPal Orders v2 with intent: AUTHORIZE. Funds are held in escrow ($0.00 captured) pending warehouse audit.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "product", "mandateText"],
+                "properties": {
+                  "amount": { "type": "string", "example": "135.00" },
+                  "currency": { "type": "string", "default": "USD" },
+                  "product": { "type": "string", "example": "Nike Pegasus Trail 4" },
+                  "mandateText": { "type": "string", "example": "100% GORE-TEX Waterproof Certified" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "PayPal Order created with approval URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": { "type": "string" },
+                    "approveLink": { "type": "string" },
+                    "intent": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/webhooks/fulfillment": {
+      "post": {
+        "operationId": "auditWarehouseFulfillment",
+        "summary": "Phase 2: Ingest Warehouse Fulfillment Webhook (Shopify/ShipBob/WMS)",
+        "description": "Receives signed warehouse packing slip or ASN event. Evaluates compliance via Gemini 3.5 Flash and deterministic fail-closed policy engine.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slipText": { "type": "string", "example": "PACKING SLIP #4092: Dispatched Nike Pegasus Trail 4 (GORE-TEX Certified)" },
+                  "warehouseId": { "type": "string", "example": "SneakerDepot NYC" },
+                  "orderId": { "type": "string", "example": "default_order" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fulfillment audit verdict and PayPal hold status"
+          }
+        }
+      }
+    },
+    "/api/orders/settle-action": {
+      "post": {
+        "operationId": "enforceSettlementAction",
+        "summary": "Phase 3: Sovereign Settlement Enforcement on PayPal Rails",
+        "description": "Executes final settlement on PayPal: CAPTURE payment if compliant, or permanently VOID authorization hold with zero fees if breached.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["action"],
+                "properties": {
+                  "action": { "type": "string", "enum": ["VOID", "CAPTURE_DISCOUNT"], "example": "VOID" },
+                  "authorizationId": { "type": "string", "example": "7VU467051N1536501" },
+                  "amount": { "type": "string", "example": "110.00" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settlement execution confirmation and PayPal receipt"
+          }
+        }
+      }
+    }
+  }
+}

@@ -108,7 +108,46 @@ app.post('/api/guardrails/pre-purchase', (req, res) => {
   });
 });
 
-// 2. Server-Sent Events (SSE) endpoint for live hands-free UI updates
+// 1.2 Phase 1: Create Mandate Order on PayPal Orders v2 Rails (REST endpoint for Custom GPT Actions & Agents)
+app.post('/api/orders/create-mandate', async (req, res) => {
+  const { amount, product, mandateText, currency } = req.body;
+
+  if (!amount || !product || !mandateText) {
+    return res.status(400).json({ error: 'Missing amount, product, or mandateText' });
+  }
+
+  try {
+    const order = await paypal.createOrder({
+      amount: String(amount),
+      currency: currency || 'USD',
+      description: `TCC Protected: ${product} (${mandateText})`
+    });
+
+    const orderId = order.orderId;
+    const internalOrder = getOrCreateOrder(orderId);
+    internalOrder.orderId = orderId;
+    internalOrder.approvedBaseline.product = product;
+    internalOrder.approvedBaseline.price = parseFloat(amount);
+    internalOrder.approvedBaseline.mandate.mandateText = mandateText;
+
+    return res.status(201).json({
+      status: 'CREATED',
+      orderId: order.orderId,
+      approveLink: order.approveLink,
+      intent: 'AUTHORIZE',
+      protectionGate: 'HOLD_PENDING_FULFILLMENT',
+      mandate: {
+        product,
+        amount: String(amount),
+        currency: currency || 'USD',
+        mandateText
+      }
+    });
+  } catch (err) {
+    console.error('[API ORDER CREATE ERROR]:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
 app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
