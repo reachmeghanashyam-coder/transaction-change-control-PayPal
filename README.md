@@ -105,8 +105,10 @@ For sandbox evaluation, PayPal requires an interactive session approval. To ensu
 
 ### Tech Stack & Multi-Client Protocols
 
-* **Consumer AI Integration (ChatGPT / OpenAI):** Official **OpenAPI 3.1 Specification** (`/openapi.json`) enabling Custom GPT Actions ([Setup Guide](CHATGPT_ACTION_GUIDE.md)).
-* **Developer AI Integration (Claude / Cursor):** Official **Model Context Protocol (MCP)** (`@modelcontextprotocol/sdk`) over Stdio.
+* **Autonomous Agent Interfaces:**
+  * **OpenAPI 3.1 Specification** (`/openapi.json` & `/docs`) for AI Agents & Custom GPT Actions ([Setup Guide](CHATGPT_ACTION_GUIDE.md)).
+  * **Model Context Protocol (MCP)** (`@modelcontextprotocol/sdk`) for Claude Desktop, Cursor, and IDE coding agents.
+  * **Autonomous Agent CLI:** `npm run agent:demo` executes full 5-act agent purchasing lifecycle against live PayPal rails.
 * **Financial Rails:** PayPal REST v2 API (`/v2/checkout/orders`, `/v2/payments/authorizations`) with `intent: AUTHORIZE`.
 * **AI Extraction Engine:** Google Gemini 3.5 Flash (`@google/genai`) with 3-tier resilient deterministic failover.
 * **WMS Webhook Ingestion:** Native Shopify (`orders/fulfilled`) & ShipBob (`order.shipment.packed`) HMAC-SHA256 signature verification.
@@ -115,28 +117,28 @@ For sandbox evaluation, PayPal requires an interactive session approval. To ensu
 
 ---
 
-### ChatGPT Custom Action Quickstart (2 Minutes)
+### Verification & Reproduction in Under 60 Seconds (Stranger Test)
 
-You can import TCC directly into ChatGPT to test autonomous shopping:
-1. In ChatGPT $\to$ **Explore GPTs** $\to$ **Create a GPT** $\to$ **Configure** $\to$ **Actions**.
-2. Click **Import from URL** and enter:
-   ```text
-   https://tcc-paypal.onrender.com/openapi.json
-   ```
-   *(Or test locally via `http://localhost:3000/openapi.json`).*
-3. Prompt ChatGPT: *"Buy Nike Pegasus Trail 4 (Size 10 US) with strict 100% GORE-TEX waterproof requirement under $135."*
-4. ChatGPT invokes `createMandateOrder` and returns the real PayPal approval link! Complete instructions in [`CHATGPT_ACTION_GUIDE.md`](CHATGPT_ACTION_GUIDE.md).
-
----
-
-### Developer Quickstart & Stranger Verification
+Any judge or developer can verify all claims locally or against our live deployment:
 
 ```bash
 # 1. Run Automated Test Suite (13/13 Passing)
 npm test
 
-# 2. Run Autonomous AI Agent CLI Demo (Full 5-Step Pipeline)
+# 2. Run Autonomous AI Agent CLI (Executes Pre-Purchase Guardrails, PayPal Orders v2 Auth Hold, WMS Audit & Void)
 npm run agent:demo
+
+# 3. View Live Spatial Financial Cockpit (Hosted on Cloud Container)
+# https://tcc-paypal.onrender.com
+```
+
+---
+
+### Optional: Enterprise Agent Integration (ChatGPT / Claude / MCP)
+
+For judges running external AI agent environments:
+* **ChatGPT Custom GPT Action:** Point any OpenAPI-compatible client to `https://tcc-paypal.onrender.com/openapi.json` ([Detailed Instructions](CHATGPT_ACTION_GUIDE.md)).
+* **MCP Stdio Server:** `node mcpServer.js` exposes 4 core settlement tools to any Model Context Protocol host.
 
 # 3. Launch MCP Server for Claude Desktop / Cursor
 npm run mcp
