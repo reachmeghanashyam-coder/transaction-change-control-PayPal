@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node --use-system-ca server.js",
     "test": "node --use-system-ca tests/test_lifecycles.js",
+    "verify:audit": "node --use-system-ca scripts/verify_audit_trail.js",
     "agent:demo": "node --use-system-ca tests/test_agent_flow.js",
     "mcp": "node --use-system-ca mcpServer.js"
   },
