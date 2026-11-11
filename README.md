@@ -12,7 +12,7 @@
 * **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R)
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
-* **Automated Integration Test Proof:** **12 Passed, 0 Failed** via `npm test` against `api-m.sandbox.paypal.com`.
+* **Automated Integration Test Proof:** **13 Passed, 0 Failed** via `npm test` against `api-m.sandbox.paypal.com`.
 
 ---
 
@@ -140,10 +140,11 @@ For judges running external AI agent environments:
 * **ChatGPT Custom GPT Action:** Point any OpenAPI-compatible client to `https://tcc-paypal.onrender.com/openapi.json` ([Detailed Instructions](CHATGPT_ACTION_GUIDE.md)).
 * **MCP Stdio Server:** `node mcpServer.js` exposes 4 core settlement tools to any Model Context Protocol host.
 
-# 3. Launch MCP Server for Claude Desktop / Cursor
+```bash
+# Launch MCP Server for Claude Desktop / Cursor
 npm run mcp
 
-# 4. Launch Local Interactive Spatial Cockpit
+# Launch Local Interactive Spatial Cockpit
 npm start
 # Cockpit:  http://localhost:3000
 # OpenAPI:  http://localhost:3000/openapi.json
