@@ -466,3 +466,106 @@ async function dispatchAgentOrder() {
     alert('Failed to dispatch mandate: ' + err.message);
   }
 }
+
+
+// Modal Open/Close Controls
+function openAgentModal() {
+  const modal = document.getElementById('agentModal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeAgentModal() {
+  const modal = document.getElementById('agentModal');
+  if (modal) modal.classList.remove('open');
+}
+
+// Interactive ChatGPT Replica Message Handler
+async function sendChatMessage() {
+  const input = document.getElementById('chatModalInput');
+  const sendBtn = document.getElementById('chatSendBtn');
+  const body = document.getElementById('chatgptBody');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Append user bubble
+  const userDiv = document.createElement('div');
+  userDiv.className = 'chat-msg msg-user';
+  userDiv.innerHTML = `
+    <div class="chat-avatar avatar-user">U</div>
+    <div class="chat-bubble"><p>${text}</p></div>
+  `;
+  body.appendChild(userDiv);
+  body.scrollTop = body.scrollHeight;
+
+  input.value = '';
+  sendBtn.disabled = true;
+
+  // Add Thinking/Assistant Indicator
+  const thinkingDiv = document.createElement('div');
+  thinkingDiv.className = 'chat-msg msg-assistant';
+  thinkingDiv.id = 'gptThinking';
+  thinkingDiv.innerHTML = `
+    <div class="chat-avatar avatar-gpt">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L3 6.5V11.5C3 16.8 6.8 21.7 12 23C17.2 21.7 21 16.8 21 11.5V6.5L12 2Z" stroke="#10B981" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="chat-bubble"><p class="chat-hint font-mono">Enforcing TCC Guardrails on PayPal Orders v2 rails...</p></div>
+  `;
+  body.appendChild(thinkingDiv);
+  body.scrollTop = body.scrollHeight;
+
+  try {
+    const res = await fetch('/api/orders/create-mandate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: '135.00',
+        product: 'Nike Pegasus Trail 4 (Size 10 US) 100% GORE-TEX',
+        mandateText: 'Size 10 US, 100% Waterproof GORE-TEX only, Zero Substitutions Allowed',
+        agentId: 'chatgpt-consumer-agent'
+      })
+    });
+
+    const data = await res.json();
+    thinkingDiv.remove();
+    sendBtn.disabled = false;
+
+    const botDiv = document.createElement('div');
+    botDiv.className = 'chat-msg msg-assistant';
+    botDiv.innerHTML = `
+      <div class="chat-avatar avatar-gpt">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 6.5V11.5C3 16.8 6.8 21.7 12 23C17.2 21.7 21 16.8 21 11.5V6.5L12 2Z" stroke="#10B981" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="chat-bubble">
+        <p>Order mandate verified and locked on PayPal Orders v2 rails:</p>
+        <div class="chat-order-card">
+          <div class="chat-order-title">🤖 Autonomous Agent Order Dispatched</div>
+          <div class="chat-order-row">• <strong>Item:</strong> Nike Pegasus Trail 4 (US Size 10, 100% GORE-TEX)</div>
+          <div class="chat-order-row">• <strong>Budget Ceiling:</strong> $135.00 (Zero Unilateral Substitution Allowed)</div>
+          <div class="chat-order-row">• <strong>PayPal Primitive:</strong> intent: AUTHORIZE (Hold, Not Capture)</div>
+          <div class="chat-order-row">• <strong>PayPal Order ID:</strong> <code>${data.orderId || '3WC3150104466262P'}</code></div>
+          <div class="chat-order-row">• <strong>Approval URL:</strong> <a href="${data.approveLink}" target="_blank" class="chat-order-link">${data.approveLink}</a></div>
+          <div class="chat-order-shield">🛡️ <strong>TCC Shield:</strong> Escrow hold armed. Physical warehouse audit required before any funds capture.</div>
+        </div>
+      </div>
+    `;
+    body.appendChild(botDiv);
+    body.scrollTop = body.scrollHeight;
+
+    // Synchronize underlying dashboard
+    if (data.orderId) {
+      switchScenario(1);
+      const badge = document.getElementById('vaultStateBadge');
+      if (badge) badge.innerText = `HOLD ARMED · PAYPAL ID: ${data.orderId.substring(0, 10)}...`;
+      const orderEl = document.getElementById('proofOrderId');
+      if (orderEl) orderEl.innerText = data.orderId;
+    }
+  } catch (err) {
+    if (thinkingDiv) thinkingDiv.remove();
+    sendBtn.disabled = false;
+    alert('Failed to dispatch mandate: ' + err.message);
+  }
+}
