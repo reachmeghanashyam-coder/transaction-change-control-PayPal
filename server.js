@@ -212,7 +212,7 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 
   const webhookResult = {
     receivedAt: new Date().toISOString(),
-    packingSlipId: packingSlipId || '#4092',
+    packingSlipId: body.packingSlipId || '#4092',
     isCompliant,
     evaluation,
     aiExtraction,
