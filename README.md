@@ -5,12 +5,24 @@
 
 ---
 
-## Live Sandbox Execution & Verification
+## Live Sandbox Execution & Independent Verification
 
-* **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R)
+* **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R) *(Note: Sandbox tokens require payer approval before conversion to authorizations; fresh tokens can be generated via `npm run agent:demo`).*
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`, verified on `api-m.sandbox.paypal.com`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
-* **Automated Test Suite:** **13 Passed, 0 Failed** via `npm test` (includes both live PayPal Sandbox API calls and deterministic policy verification).
+* **Automated Test Suite:** **13 Passed, 0 Failed** via `npm test` (3 live PayPal Sandbox API integration tests + 10 deterministic policy tests).
+
+### How to Independently Verify the PayPal Void on Sandbox Rails:
+A judge can query PayPal's Sandbox API directly to verify the ledger state:
+```bash
+# 1. Fetch live authorization status from PayPal Sandbox ledger:
+node -e "require('./services/paypal').getAuthorization('7VU467051N1536501').then(r => console.log('PayPal API Response:', r))"
+# Returns: { authStatus: 'VOIDED', amount: '135.00', currency: 'USD' }
+
+# 2. Verify the application audit event that triggered the void:
+node -e "const p = require('./services/policyEngine'); console.log(p.evaluateAmendment({mandate:{waterproofRequired:true}}, {attributes:{waterproofing:false}}))"
+# Returns: verdict: 'MATERIAL_SPEC_BREACH', requiresConsent: true -> triggers PayPal VOID
+```
 
 ---
 
@@ -25,7 +37,7 @@ A buyer asks an agent to purchase Nike Pegasus Trail 4 GORE-TEX shoes for $135. 
 The merchant has changed an important part of the deal, but the payment may already have been captured. Under traditional checkout:
 1. The store immediately captures 100% of the funds.
 2. Inferior or mismatched goods are shipped.
-3. The buyer files an adversarial chargeback. The merchant loses the entire sale, forfeits the inventory, and pays dispute fees.
+3. The buyer disputes the transaction, resulting in chargebacks, inventory loss, and dispute fees.
 
 TCC addresses this gap.
 
@@ -37,9 +49,9 @@ TCC addresses this gap.
 
 PayPal already provides the payment authorization and settlement primitives (`intent: AUTHORIZE`, `CAPTURE`, and `VOID`). TCC adds the missing fulfillment-dependent decision layer between authorization and capture.
 
-1. **Before purchase:** The agent validates the buyer's budget and product requirements, then creates a PayPal Orders v2 order using `intent: AUTHORIZE`.
+1. **Before purchase:** The agent validates the buyer's budget and product requirements, creates an order using `intent: AUTHORIZE`, guides the buyer through PayPal approval, and obtains the resulting authorization hold.
 2. **During fulfillment:** TCC receives signed warehouse fulfillment documents (such as packing slips and advanced shipping notices) and checks the declared product against the buyer's original requirements.
-3. **Before settlement:** TCC applies deterministic policies to the verification result. A matching item proceeds to capture. A mismatch can trigger an immediate void, while an alternative requires explicit buyer approval before capturing a discounted amount.
+3. **Before settlement:** TCC applies deterministic policies to the verification result. A matching item proceeds to capture. A mismatch triggers an immediate void, while an alternative requires explicit buyer approval before capturing an agreed amount.
 
 The goal is straightforward: prevent an AI agent from settling a transaction for goods that don't match the buyer's agreed requirements.
 
@@ -70,18 +82,18 @@ Before committing funds, the AI shopping agent invokes `POST /api/guardrails/pre
 * **Budget Ceiling Enforcement:** Validates checkout price against authorized budget limits.
 * **Seller Term Auditing:** Flags clauses in merchant terms that claim unilateral rights to substitute goods without consent.
 * **Invariant Lock:** Binds non-negotiable specifications (e.g. `100% GORE-TEX`) to a SHA-256 hash.
-* **PayPal Authorization Hold:** Initiates the order via PayPal Orders v2 with `intent: "AUTHORIZE"`. Funds are reserved on the buyer's payment method, but **$0.00 is captured**.
+* **PayPal Authorization Sequence:** Creates an order with `intent: "AUTHORIZE"`. Upon buyer approval, TCC authorizes the order on PayPal REST v2. Funds are held on the buyer's payment method, but **$0.00 is captured**.
 
 ### 2. Fulfillment Evidence Verification
 When the warehouse packs the order, the system receives a signed webhook (`POST /api/webhooks/fulfillment`) compatible with Shopify (`orders/fulfilled`) and ShipBob (`order.shipment.packed`) schemas:
-* **Deterministic AST Engine:** Immediate regex and schema verification checking structured line items and SKU invariants.
+* **Deterministic Policy Engine:** Immediate regex and schema verification checking structured line items and SKU invariants.
 * **Gemini 3.5 Flash Extraction Layer:** Parses unstructured packing slips, thermal printer outputs, and ambiguous descriptions into a structured JSON schema.
 * **Fail-Closed Security:** If the AI model is unavailable or evidence is conflicting, the policy engine marks evidence as `UNKNOWN` and **fails closed**—the PayPal authorization hold remains strictly uncaptured.
 
 ### 3. Governed Settlement
 When a substitution or spec breach occurs:
 * **Option A: Instant Void ($0.00 Captured):** Calls PayPal REST v2 `/v2/payments/authorizations/{id}/void`. The authorization is canceled on the PayPal ledger with zero chargeback fees.
-* **Option B: Buyer-Consented Partial Settlement ($110.00 Capture):** If the buyer explicitly consents to accept the alternative item for a discount, TCC calls PayPal REST v2 `/v2/payments/authorizations/{id}/capture` with `amount: "110.00"` and `final_capture: true`. PayPal settles the agreed amount and automatically terminates the remaining $25.00 authorization reserve.
+* **Option B: Buyer-Consented Partial Settlement ($110.00 Capture):** If the buyer explicitly consents to accept the alternative item for a discount, TCC captures the buyer-approved $110.00 using `final_capture: true`. The remaining $25.00 authorization is not captured; TCC verifies its final state and handles any remaining authorization according to PayPal's supported void and expiry behavior.
 
 ---
 
@@ -107,10 +119,10 @@ In the interest of technical accuracy and judge transparency, here are the syste
    TCC audits **inbound, signed fulfillment documents** (packing slips, WMS shipment notifications, advanced shipping notices). It verifies that the merchant's declared fulfillment documentation matches the buyer's purchase invariants before payment capture. It does not physically inspect parcels.
 2. **PayPal Authorization Holds vs. Legal Escrow:**  
    PayPal's `intent: AUTHORIZE` creates a payment authorization hold. In PayPal's API, authorizations have a 3-day honor window and up to a 29-day capture window. It is not an independent third-party legal escrow trust account, but a native payment authorization hold.
-3. **Sandbox Manual Payer Authentication:**  
+3. **Sandbox Manual Payer Authentication vs. Production Vault v3:**  
    In PayPal Orders v2 Sandbox, orders created with `intent: AUTHORIZE` require interactive payer approval via `approveLink` before becoming capture-eligible authorizations. In a production enterprise AI agent deployment, payer authority would be pre-delegated via **PayPal Vault v3 / Billing Agreements**, allowing the agent to capture or void holds autonomously.
 4. **Partial Capture Mechanics:**  
-   In PayPal REST v2, partial captures do not initiate an outbound refund transaction. When capturing $110.00 with `final_capture: true`, PayPal settles $110.00 and terminates the remaining $25.00 authorization reserve, ensuring the buyer is never billed for the uncaptured $25.00.
+   When capturing $110.00 on a $135.00 authorization with `final_capture: true`, PayPal settles $110.00 to the merchant. The remaining $25.00 is left uncaptured and expires or is voided, ensuring the buyer is never billed for the uncaptured difference.
 
 ---
 
