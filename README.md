@@ -103,20 +103,36 @@ For sandbox evaluation, PayPal requires an interactive session approval. To ensu
 
 ---
 
-### Tech Stack & Protocols
+### Tech Stack & Multi-Client Protocols
 
-* **Financial Rails:** PayPal REST v2 API (`/v2/checkout/orders`, `/v2/payments/authorizations`)
-* **AI Extraction Engine:** Google Gemini 3.5 Flash (`@google/genai`) with strict JSON schema parsing
-* **Agent Protocol:** Official Model Context Protocol (`@modelcontextprotocol/sdk`) exposing 4 production tools
-* **Gateway & Webhooks:** Node.js, Express, Server-Sent Events (SSE), HMAC-SHA256 signature verification
-* **Test Suite:** Zero-dependency automated test runner (`tests/test_lifecycles.js`) — 12 passing tests
+* **Consumer AI Integration (ChatGPT / OpenAI):** Official **OpenAPI 3.1 Specification** (`/openapi.json`) enabling Custom GPT Actions ([Setup Guide](CHATGPT_ACTION_GUIDE.md)).
+* **Developer AI Integration (Claude / Cursor):** Official **Model Context Protocol (MCP)** (`@modelcontextprotocol/sdk`) over Stdio.
+* **Financial Rails:** PayPal REST v2 API (`/v2/checkout/orders`, `/v2/payments/authorizations`) with `intent: AUTHORIZE`.
+* **AI Extraction Engine:** Google Gemini 3.5 Flash (`@google/genai`) with 3-tier resilient deterministic failover.
+* **WMS Webhook Ingestion:** Native Shopify (`orders/fulfilled`) & ShipBob (`order.shipment.packed`) HMAC-SHA256 signature verification.
+* **Backend:** Node.js, Express, Server-Sent Events (SSE).
+* **Test Suite:** Zero-dependency automated test runner (`tests/test_lifecycles.js`) — **13 passing integration tests**.
 
 ---
 
-### Quickstart & Stranger Verification
+### ChatGPT Custom Action Quickstart (2 Minutes)
+
+You can import TCC directly into ChatGPT to test autonomous shopping:
+1. In ChatGPT $\to$ **Explore GPTs** $\to$ **Create a GPT** $\to$ **Configure** $\to$ **Actions**.
+2. Click **Import from URL** and enter:
+   ```text
+   https://tcc-paypal.onrender.com/openapi.json
+   ```
+   *(Or test locally via `http://localhost:3000/openapi.json`).*
+3. Prompt ChatGPT: *"Buy Nike Pegasus Trail 4 (Size 10 US) with strict 100% GORE-TEX waterproof requirement under $135."*
+4. ChatGPT invokes `createMandateOrder` and returns the real PayPal approval link! Complete instructions in [`CHATGPT_ACTION_GUIDE.md`](CHATGPT_ACTION_GUIDE.md).
+
+---
+
+### Developer Quickstart & Stranger Verification
 
 ```bash
-# 1. Run Automated Test Suite (12/12 Passing)
+# 1. Run Automated Test Suite (13/13 Passing)
 npm test
 
 # 2. Run Autonomous AI Agent CLI Demo (Full 5-Step Pipeline)
@@ -128,6 +144,7 @@ npm run mcp
 # 4. Launch Local Interactive Spatial Cockpit
 npm start
 # Cockpit:  http://localhost:3000
-# OpenAPI:  http://localhost:3000/docs
+# OpenAPI:  http://localhost:3000/openapi.json
+# Swagger:  http://localhost:3000/docs
 # Health:   http://localhost:3000/health
 ```
