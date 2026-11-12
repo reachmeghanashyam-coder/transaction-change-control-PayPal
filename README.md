@@ -83,11 +83,11 @@ Before committing funds, the AI shopping agent invokes `POST /api/guardrails/pre
 * **Invariant Lock:** Binds non-negotiable specifications (e.g. `100% GORE-TEX`) to a SHA-256 hash.
 * **PayPal Authorization Sequence:** Creates an order with `intent: "AUTHORIZE"`. Upon buyer approval, TCC authorizes the order on PayPal REST v2. Funds are held on the buyer's payment method, but **$0.00 is captured**.
 
-### 2. Fulfillment Evidence Verification
-When the warehouse packs the order, the system receives a signed webhook (`POST /api/webhooks/fulfillment`) compatible with Shopify (`orders/fulfilled`) and ShipBob (`order.shipment.packed`) schemas:
-* **Deterministic Policy Engine:** Immediate regex and schema verification checking structured line items and SKU invariants.
-* **Gemini 3.5 Flash Extraction Layer:** Parses unstructured packing slips, thermal printer outputs, and ambiguous descriptions into a structured JSON schema.
-* **Fail-Closed Security:** If the AI model is unavailable or evidence is conflicting, the policy engine marks evidence as `UNKNOWN` and **fails closed**—the PayPal authorization hold remains strictly uncaptured.
+### 2. Fulfillment Evidence Verification (Why AI is Irreplaceable Here)
+When the warehouse packs the order, the system receives an inbound fulfillment payload (`POST /api/webhooks/fulfillment`) compatible with Shopify (`orders/fulfilled`) and ShipBob (`order.shipment.packed`) schemas:
+* **The Real-World Problem:** Warehouses don't send clean foreign database keys. They emit messy thermal OCR packing slips with ambiguous shorthand (e.g., *"Dispatched Peg4 Rd Ed - equiv spec"*). A traditional database or regex lookup cannot determine whether *"open-mesh road runner"* satisfies a mandate requiring *"100% Waterproof GORE-TEX"*.
+* **Gemini 3.5 Flash Semantic Material Inference:** Gemini extracts unstructured line items, thermal shorthand, and packaging notes, performing physical material reasoning to evaluate whether the shipped item genuinely satisfies the buyer's invariant contract.
+* **Deterministic Policy Engine:** Combines Gemini's structured semantic extraction with deterministic fail-closed rules. If evidence is missing, conflicting, or the AI service is unreachable, the engine marks the evidence as `UNKNOWN` and **fails closed**—the PayPal authorization hold remains strictly uncaptured ($0.00).
 
 ### 3. Governed Settlement
 When a substitution or spec breach occurs:
