@@ -7,6 +7,7 @@
 
 ## Live Sandbox Execution & Correlated Verification
 
+* **Demo Video (YouTube):** [https://youtu.be/twgQyYABZqo](https://youtu.be/twgQyYABZqo)
 * **Live Hosted Instance (Render):** [https://tcc-paypal.onrender.com](https://tcc-paypal.onrender.com) *(Hosted on Render Free Tier. If cold, please allow ~25 seconds for initial instance spin-up).*
 * **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R) *(Note: Sandbox tokens require interactive payer approval before conversion to authorizations; fresh tokens can be generated via `npm run agent:demo`).*
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`, verified on `api-m.sandbox.paypal.com`)
