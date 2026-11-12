@@ -48,6 +48,24 @@ TCC addresses this gap.
 
 ---
 
+## System Architecture & Live UI Walkthrough
+
+| 1. Pristine Pre-Dispatch Hold (`intent: AUTHORIZE`) | 2. Event 01: Compliant Dispatch ($135 Capture) |
+| :---: | :---: |
+| ![Pre-Dispatch Hold](docs/screenshots/01_pre_dispatch_hold.jpg) | ![Compliant Capture](docs/screenshots/02_compliant_dispatch_capture.jpg) |
+| *Buyer mandate armed; $135 held on PayPal reserve with $0 captured.* | *Packing slip matches GORE-TEX invariant; full $135 payment released.* |
+
+| 3. Event 02: Substitution Breach (Settlement Freeze) | 4. Event 03: WMS $25 Credit Amendment ($110 Salvage) |
+| :---: | :---: |
+| ![Breach Freeze](docs/screenshots/03_substitution_breach_freeze.jpg) | ![Discount Amendment](docs/screenshots/04_discount_amendment_offer.jpg) |
+| *Open-mesh downgrade detected; PayPal freeze triggered; buyer can void.* | *Warehouse applies $25 credit; buyer accepts $110 capture + auto-refund.* |
+
+### Verified Judge Evidence Vault (Live PayPal Rails)
+![Judge Evidence Vault](docs/screenshots/05_judge_evidence_vault.png)
+*Live PayPal Orders v2 Order ID `36S14862Y66466816` and Authorization ID `7VU467051N1536501` verified against sandbox ledger with 14/14 automated tests passing.*
+
+---
+
 ## What TCC Does
 
 PayPal already provides the payment authorization and settlement primitives (`intent: AUTHORIZE`, `CAPTURE`, and `VOID`). TCC adds the missing fulfillment-dependent decision layer between authorization and capture.
