@@ -8,8 +8,8 @@ const aiExtractor = require('../services/aiExtractor');
 
 async function verifyCorrelatedAuditTrail() {
   console.log('\n================================================================');
-  console.log('   TCC CORRELATED AUDIT TRAIL VERIFICATION                      ');
-  console.log('   Proving Causal Link: Inbound Webhook -> Breach -> PayPal Void');
+  console.log('   TCC AUDIT TRAIL VERIFICATION                                ');
+  console.log('   Demonstrating: Inbound Breach -> Settlement Freeze -> Void Record');
   console.log('================================================================\n');
 
   const authId = '7VU467051N1536501';
@@ -41,7 +41,7 @@ async function verifyCorrelatedAuditTrail() {
   console.log(`   Verdict:                 ${evaluation.verdict}`);
   console.log(`   Violations Detected:     ${evaluation.violations.length}`);
   console.log(`   Reason:                  ${evaluation.violations[0]?.reason || evaluation.summary}`);
-  console.log(`   Governed Settlement Gate: TRIGGER VOID_AUTHORIZATION\n`);
+  console.log(`   Governed Settlement Gate: HOLD_FROZEN (Buyer-Consent Gate Activated)\n`);
 
   console.log(`[4. LIVE PAYPAL REST V2 SANDBOX LEDGER INQUIRY]`);
   console.log(`   Querying api-m.sandbox.paypal.com for Authorization ID: ${authId}...`);
@@ -53,7 +53,7 @@ async function verifyCorrelatedAuditTrail() {
   console.log(`   Ledger State Integrity:  VERIFIED ON LIVE PAYPAL SANDBOX (Status: VOIDED)\n`);
 
   console.log('================================================================');
-  console.log('   INTEGRATED WORKFLOW VERIFICATION: COMPLETE (100% CORRELATED) ');
+  console.log('   AUDIT RECORD VERIFICATION: COMPLETE (LEDGER STATUS: VOIDED)  ');
   console.log('================================================================\n');
 }
 

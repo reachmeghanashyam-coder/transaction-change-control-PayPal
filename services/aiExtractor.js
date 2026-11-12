@@ -73,7 +73,7 @@ Respond in pure JSON matching this exact structure:
   "confidenceScore": 0.95
 }`;
 
-      const response = await ai.models.generateContent({
+      const generatePromise = ai.models.generateContent({
         model: modelName,
         contents: prompt,
         config: {
@@ -81,6 +81,10 @@ Respond in pure JSON matching this exact structure:
           temperature: 0.1
         }
       });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI extraction timeout (6000ms SLA exceeded)')), 6000)
+      );
+      const response = await Promise.race([generatePromise, timeoutPromise]);
 
       const latencyMs = Date.now() - start;
       let cleanText = response.text.trim();

@@ -14,15 +14,15 @@
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
 * **Automated Test Suite:** **16 Passed, 0 Failed** via `npm test` (3 live API integration tests [2 PayPal REST Sandbox + 1 Gemini 3.5 Flash] + 13 deterministic policy, security & Express route integration tests).
 
-### How to Independently Verify the Correlated Mismatch-to-Void Workflow:
-To prove the causal link connecting the buyer mandate, warehouse packing slip mismatch, and the resulting PayPal Sandbox void:
+### How to Independently Verify the Invariant Breach & Ledger Audit Trail:
+To inspect how an inbound fulfillment mismatch activates the settlement freeze gate and verify the permanent sandbox void record:
 ```bash
 npm run verify:audit
 ```
 This executes `scripts/verify_audit_trail.js`, querying `api-m.sandbox.paypal.com` directly:
 1. **Mandate Reference:** Binds PayPal Order `36S14862Y66466816` and Authorization `7VU467051N1536501` to the $135.00 GORE-TEX specification.
 2. **Fulfillment Evidence:** Ingests signed packing slip `#4092` attempting an unapproved open-mesh substitution.
-3. **Policy Decision:** Triggers `MATERIAL_SPEC_BREACH` and halts capture.
+3. **Policy Decision:** Triggers `MATERIAL_SPEC_BREACH` and engages the `HOLD_FROZEN` settlement freeze gate.
 4. **PayPal Ledger Verification:** Live query confirms PayPal Authorization `7VU467051N1536501` is `VOIDED` with $0.00 captured.
 
 > **Note on PayPal Orders v2 Sandbox Evaluation & Strict Financial Rails:**
@@ -165,7 +165,7 @@ npm run test:live:server
 # 2. Run Standalone PayPal Order Creation Probe (Hits live sandbox)
 npm run test:paypal:live
 
-# 2. Run Correlated Audit Trail Verification (Proves Inbound Webhook -> Breach -> PayPal Void)
+# 2. Run Audit Trail Verification (Verifies Breach Detection -> Settlement Freeze -> PayPal Void Status)
 npm run verify:audit
 
 # 3. Run Autonomous AI Agent CLI Demonstration

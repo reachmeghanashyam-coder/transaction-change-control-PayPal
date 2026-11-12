@@ -41,20 +41,20 @@ ordersRegistry.set('36S14862Y66466816', {
   auditLog: []
 });
 
-function getOrCreateOrder(orderId = 'default_order') {
+function getOrCreateOrder(orderId = '36S14862Y66466816') {
   if (!ordersRegistry.has(orderId)) {
     ordersRegistry.set(orderId, {
-      orderId: '36S14862Y66466816',
-      authorizationId: '7VU467051N1536501',
-      financialState: 'HOLD_LOCKED',
-      heldAmount: '135.00',
+      orderId,
+      authorizationId: null,
+      financialState: 'UNINITIALIZED',
+      heldAmount: '0.00',
       capturedAmount: '0.00',
       approvedBaseline: {
-        product: 'Nike Pegasus Trail 4 GORE-TEX (Size 10 US)',
-        price: '135.00',
+        product: 'Unspecified Product',
+        price: 0.00,
         mandate: {
-          waterproofRequired: true,
-          mandateText: '100% Certified Waterproof GORE-TEX Membrane'
+          waterproofRequired: false,
+          mandateText: ''
         }
       },
       auditLog: []
@@ -204,9 +204,13 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
     });
   }
 
-  // Cryptographic HMAC-SHA256 Verification against raw request bytes
-  const rawPayload = req.rawBody || Buffer.from(JSON.stringify(req.body));
-  const expectedHex = crypto.createHmac('sha256', webhookSecret).update(rawPayload).digest('hex');
+  // Cryptographic HMAC-SHA256 Verification strictly against captured raw request bytes (zero fallback)
+  if (!req.rawBody) {
+    console.error('[WMS REJECTION] Raw request body buffer was not captured by middleware.');
+    return res.status(500).json({ error: 'SERVER_ERROR: Raw request body buffer was not captured.' });
+  }
+
+  const expectedHex = crypto.createHmac('sha256', webhookSecret).update(req.rawBody).digest('hex');
   const sigBuffer = Buffer.from(signature);
   const hexBuffer = Buffer.from(expectedHex);
 
