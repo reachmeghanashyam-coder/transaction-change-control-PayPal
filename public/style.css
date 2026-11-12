@@ -1299,3 +1299,13 @@ body::before {
   color: #8E8EA0;
   margin-top: 8px;
 }
+
+/* Dynamic Void vs Capture Pill States */
+.receipt-pill.pill-void {
+  background: rgba(244, 63, 94, 0.12) !important;
+  border: 1px solid rgba(244, 63, 94, 0.5) !important;
+}
+.receipt-pill.pill-capture {
+  background: rgba(16, 185, 129, 0.12) !important;
+  border: 1px solid rgba(16, 185, 129, 0.5) !important;
+}

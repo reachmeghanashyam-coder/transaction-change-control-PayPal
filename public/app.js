@@ -361,7 +361,10 @@ async function triggerVoidAction() {
     // Show verified receipt inside action dock
     const receipt = document.getElementById('miniReceipt');
     receipt.style.display = 'flex';
-    document.getElementById('miniReceiptText').innerHTML = 'AUTHORIZATION VOIDED (HTTP 204) · $0.00 CHARGED';
+    receipt.className = 'receipt-pill pill-void';
+    const label = document.getElementById('miniReceiptLabel');
+    if (label) { label.className = 'text-rose font-semibold'; label.innerText = '✕ SETTLEMENT:'; }
+    document.getElementById('miniReceiptText').innerHTML = '<span class="text-rose font-semibold">AUTHORIZATION VOIDED (HTTP 204)</span> · $0.00 CHARGED';
 
     updateTimelineStep(4, 'completed', 'Settled: Authorization Voided ($0.00)');
     document.getElementById('proofStateText').innerHTML = '<span class="text-rose font-semibold">VOIDED</span>';
@@ -405,7 +408,10 @@ async function triggerAcceptDiscount() {
     // Show verified receipt inside action dock
     const receipt = document.getElementById('miniReceipt');
     receipt.style.display = 'flex';
-    document.getElementById('miniReceiptText').innerHTML = 'CAPTURE: $110.00 · AUTO-RELEASED: $25.00';
+    receipt.className = 'receipt-pill pill-capture';
+    const labelCap = document.getElementById('miniReceiptLabel');
+    if (labelCap) { labelCap.className = 'text-green font-semibold'; labelCap.innerText = '✓ SETTLEMENT:'; }
+    document.getElementById('miniReceiptText').innerHTML = '<span class="text-green font-semibold">CAPTURE: $110.00</span> · AUTO-RELEASED: $25.00';
 
     updateTimelineStep(4, 'completed', 'Settled: Partial Capture ($110.00)');
     document.getElementById('proofStateText').innerHTML = '<span class="text-green font-semibold">CAPTURED_PARTIAL</span>';
