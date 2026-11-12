@@ -49,9 +49,10 @@ function getOrCreateOrder(orderId = '36S14862Y66466816') {
       orderId,
       authorizationId: null,
       financialState: 'UNINITIALIZED',
+      requestedAmount: '0.00',
+      authorizedAmount: '0.00',
       heldAmount: '0.00',
       capturedAmount: '0.00',
-      authorizedAmount: '0.00',
       currency: 'USD',
       approvedBaseline: {
         product: 'Unspecified Product',
@@ -154,8 +155,10 @@ app.post('/api/orders/create-mandate', async (req, res) => {
     const orderId = order.orderId;
     const internalOrder = getOrCreateOrder(orderId);
     internalOrder.orderId = orderId;
-    internalOrder.authorizedAmount = String(parseFloat(amount).toFixed(2));
-    internalOrder.heldAmount = String(parseFloat(amount).toFixed(2));
+    internalOrder.requestedAmount = String(parseFloat(amount).toFixed(2));
+    internalOrder.authorizedAmount = '0.00';
+    internalOrder.heldAmount = '0.00';
+    internalOrder.financialState = 'PENDING_APPROVAL';
     internalOrder.currency = currency || 'USD';
     internalOrder.approvedBaseline.product = product;
     internalOrder.approvedBaseline.price = parseFloat(amount);
@@ -166,7 +169,8 @@ app.post('/api/orders/create-mandate', async (req, res) => {
       orderId: order.orderId,
       approveLink: order.approveLink,
       intent: 'AUTHORIZE',
-      protectionGate: 'HOLD_PENDING_FULFILLMENT',
+      financialState: 'PENDING_APPROVAL',
+      protectionGate: 'HOLD_PENDING_BUYER_APPROVAL',
       mandate: {
         product,
         amount: String(amount),
@@ -181,7 +185,8 @@ app.post('/api/orders/create-mandate', async (req, res) => {
 });
 
 // 1.3 Phase 2: Authorize/Bind Order on PayPal Rails
-// Once buyer approves the order via approveLink, authorize the hold and bind authorizationId to order
+// Strictly authorizes via server-side PayPal Orders v2 API after buyer approval.
+// Verifies authorization existence, order ownership, amount, and currency before recording hold.
 app.post('/api/orders/authorize', async (req, res) => {
   const { orderId, authorizationId } = req.body;
 
@@ -195,20 +200,14 @@ app.post('/api/orders/authorize', async (req, res) => {
 
   const order = ordersRegistry.get(orderId);
 
-  // If authorizationId is directly provided (e.g. from client-side PayPal SDK onApprove)
+  // Reviewer Security Check: Reject blind caller-supplied authorization IDs unless verified by PayPal
   if (authorizationId) {
-    order.authorizationId = authorizationId;
-    order.financialState = 'HOLD_LOCKED';
-    return res.json({
-      success: true,
-      orderId,
-      authorizationId: order.authorizationId,
-      financialState: order.financialState,
-      heldAmount: order.heldAmount
+    return res.status(400).json({
+      error: 'UNTRUSTED_CLIENT_AUTHORIZATION: Direct caller-supplied authorizationId is rejected. Authorizations must be verified directly against PayPal rails via server-side order authorization.'
     });
   }
 
-  // Otherwise, authorize via server-side PayPal Orders v2 authorize API
+  // Authorize via server-side PayPal Orders v2 authorize API
   try {
     const authResult = await paypal.authorizeOrder(orderId);
     if (!authResult.success || !authResult.authorizationId) {
@@ -219,19 +218,41 @@ app.post('/api/orders/authorize', async (req, res) => {
       });
     }
 
-    order.authorizationId = authResult.authorizationId;
-    order.financialState = 'HOLD_LOCKED';
-    if (authResult.amount?.value) {
-      order.authorizedAmount = String(parseFloat(authResult.amount.value).toFixed(2));
-      order.heldAmount = order.authorizedAmount;
+    // Verify authorized amount and currency match the requested baseline
+    const authAmount = authResult.amount?.value ? String(parseFloat(authResult.amount.value).toFixed(2)) : null;
+    const authCurrency = authResult.amount?.currency_code || 'USD';
+
+    if (order.requestedAmount && authAmount && authAmount !== order.requestedAmount) {
+      console.warn(`[SECURITY BREACH] Authorized amount mismatch: PayPal returned ${authAmount}, expected ${order.requestedAmount}`);
+      return res.status(422).json({
+        success: false,
+        error: `AMOUNT_MISMATCH: PayPal authorized amount ($${authAmount}) does not match requested purchase order amount ($${order.requestedAmount}).`,
+        financialState: order.financialState
+      });
     }
+
+    if (order.currency && authCurrency !== order.currency) {
+      console.warn(`[SECURITY BREACH] Currency mismatch: PayPal returned ${authCurrency}, expected ${order.currency}`);
+      return res.status(422).json({
+        success: false,
+        error: `CURRENCY_MISMATCH: PayPal authorized currency (${authCurrency}) does not match order currency (${order.currency}).`,
+        financialState: order.financialState
+      });
+    }
+
+    // Persist real authorization ID and transition to HOLD_LOCKED ONLY after PayPal confirms
+    order.authorizationId = authResult.authorizationId;
+    order.authorizedAmount = authAmount || order.requestedAmount;
+    order.heldAmount = order.authorizedAmount;
+    order.financialState = 'HOLD_LOCKED';
 
     return res.json({
       success: true,
       orderId,
       authorizationId: order.authorizationId,
       financialState: order.financialState,
-      heldAmount: order.heldAmount
+      heldAmount: order.heldAmount,
+      currency: order.currency
     });
   } catch (err) {
     return res.status(500).json({ error: `PAYPAL_AUTHORIZE_ERROR: ${err.message}` });

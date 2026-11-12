@@ -48,7 +48,7 @@ async function getAccessToken() {
   return cachedToken;
 }
 
-async function createOrder({ amount = '135.00', description = 'Nike Pegasus Trail 4 GORE-TEX' }) {
+async function createOrder({ amount = '135.00', currency = 'USD', description = 'Nike Pegasus Trail 4 GORE-TEX' }) {
   const token = await getAccessToken();
   const start = Date.now();
   const res = await fetch(`${BASE_URL}/v2/checkout/orders`, {
@@ -65,7 +65,7 @@ async function createOrder({ amount = '135.00', description = 'Nike Pegasus Trai
           reference_id: 'tcc_' + Date.now(),
           description: description,
           amount: {
-            currency_code: 'USD',
+            currency_code: currency || 'USD',
             value: amount
           }
         }

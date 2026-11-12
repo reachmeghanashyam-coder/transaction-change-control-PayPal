@@ -320,7 +320,7 @@ async function runTests() {
       assert.ok(hookJson.error.includes('ORDER_NOT_AUTHORIZED'));
     });
 
-    await testAsync('Dynamic Order Integrity: Order authorization binds correctly with non-$135 amount', async () => {
+    await testAsync('Authorization Security: Rejects arbitrary client-supplied authorizationId (HTTP 400)', async () => {
       // 1. Create a dynamic order for $450.00
       const createRes = await fetch(`${baseUrl}/api/orders/create-mandate`, {
         method: 'POST',
@@ -328,6 +328,7 @@ async function runTests() {
         body: JSON.stringify({
           product: 'Dell PowerEdge ECC Server Memory Kit',
           amount: '450.00',
+          currency: 'USD',
           mandateText: '64GB DDR5 Registered ECC UDIMM'
         })
       });
@@ -335,8 +336,15 @@ async function runTests() {
       const orderData = await createRes.json();
       const dynOrderId = orderData.orderId;
 
-      // 2. Authorize and bind specific authorization ID
-      const authRes = await fetch(`${baseUrl}/api/orders/authorize`, {
+      // Assert that heldAmount is 0.00 and state is PENDING_APPROVAL before authorization
+      assert.strictEqual(orderData.financialState, 'PENDING_APPROVAL');
+      const orderInRegistry = ordersRegistry.get(dynOrderId);
+      assert.strictEqual(orderInRegistry.heldAmount, '0.00');
+      assert.strictEqual(orderInRegistry.authorizedAmount, '0.00');
+      assert.strictEqual(orderInRegistry.requestedAmount, '450.00');
+
+      // 2. Attempt to supply an unverified caller-supplied authorizationId -> MUST BE REJECTED
+      const fakeAuthRes = await fetch(`${baseUrl}/api/orders/authorize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -344,16 +352,68 @@ async function runTests() {
           authorizationId: 'TEST_AUTH_DYN_450'
         })
       });
-      assert.strictEqual(authRes.status, 200);
-      const authJson = await authRes.json();
-      assert.strictEqual(authJson.authorizationId, 'TEST_AUTH_DYN_450');
-      assert.strictEqual(authJson.financialState, 'HOLD_LOCKED');
-      assert.strictEqual(authJson.heldAmount, '450.00');
+      assert.strictEqual(fakeAuthRes.status, 400);
+      const fakeAuthJson = await fakeAuthRes.json();
+      assert.ok(fakeAuthJson.error.includes('UNTRUSTED_CLIENT_AUTHORIZATION'));
+    });
 
-      // 3. Verify internal registry order integrity
-      const registered = ordersRegistry.get(dynOrderId);
-      assert.strictEqual(registered.authorizedAmount, '450.00');
-      assert.strictEqual(registered.authorizationId, 'TEST_AUTH_DYN_450');
+    await testAsync('Server-Side Authorization Rails: Verifies PayPal authorization and locks hold on matching amount', async () => {
+      // Register mock order to test server-side authorizeOrder path
+      const mockOrderId = 'TEST_ORD_MOCK_SERVER_AUTH';
+      const mockOrder = {
+        orderId: mockOrderId,
+        authorizationId: null,
+        financialState: 'PENDING_APPROVAL',
+        requestedAmount: '350.00',
+        authorizedAmount: '0.00',
+        heldAmount: '0.00',
+        capturedAmount: '0.00',
+        currency: 'USD',
+        approvedBaseline: {
+          product: 'High-Precision CNC Milling Bit',
+          price: 350.00,
+          mandate: {
+            waterproofRequired: false,
+            mandateText: 'Solid Carbide 4-Flute'
+          }
+        },
+        auditLog: []
+      };
+      ordersRegistry.set(mockOrderId, mockOrder);
+
+      // Temporarily mock paypal.authorizeOrder to simulate valid PayPal rails response
+      const originalAuthorize = paypal.authorizeOrder;
+      paypal.authorizeOrder = async (id) => {
+        return {
+          success: true,
+          status: 201,
+          authorizationId: 'AUTH_PAYPAL_VERIFIED_98765',
+          authStatus: 'CREATED',
+          amount: { currency_code: 'USD', value: '350.00' }
+        };
+      };
+
+      try {
+        const authRes = await fetch(`${baseUrl}/api/orders/authorize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: mockOrderId })
+        });
+        assert.strictEqual(authRes.status, 200);
+        const authJson = await authRes.json();
+        assert.strictEqual(authJson.authorizationId, 'AUTH_PAYPAL_VERIFIED_98765');
+        assert.strictEqual(authJson.financialState, 'HOLD_LOCKED');
+        assert.strictEqual(authJson.heldAmount, '350.00');
+
+        // Verify ledger integrity in registry
+        const updated = ordersRegistry.get(mockOrderId);
+        assert.strictEqual(updated.authorizationId, 'AUTH_PAYPAL_VERIFIED_98765');
+        assert.strictEqual(updated.financialState, 'HOLD_LOCKED');
+        assert.strictEqual(updated.heldAmount, '350.00');
+        assert.strictEqual(updated.authorizedAmount, '350.00');
+      } finally {
+        paypal.authorizeOrder = originalAuthorize;
+      }
     });
 
   } finally {
