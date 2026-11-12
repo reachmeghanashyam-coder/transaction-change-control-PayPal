@@ -495,57 +495,17 @@ app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
   const captureAmount = order.authorizedAmount || order.heldAmount || '135.00';
 
   if (eventType === 'CLEAN' && evaluation.verdict === 'COMPLIANT_FULFILLMENT') {
-    // Reviewer Priority #3: Real rail verification rather than blind state mutation
-    let liveAuthStatus = 'UNKNOWN';
-    try {
-      const authCheck = await paypal.getAuthorization(order.authorizationId);
-      if (authCheck.success) liveAuthStatus = authCheck.authStatus;
-    } catch (e) {
-      console.warn('[INGEST] PayPal auth check warning:', e.message);
-    }
-
-    if (liveAuthStatus === 'AUTHORIZED' || liveAuthStatus === 'CREATED') {
-      try {
-        const cap = await paypal.captureAuthorization(order.authorizationId, captureAmount, true);
-        if (cap.success && cap.captureId) {
-          order.financialState = 'CAPTURED';
-          order.capturedAmount = captureAmount;
-          order.heldAmount = '0.00';
-          ledgerUpdate = {
-            heldAmount: '0.00',
-            capturedAmount: captureAmount,
-            financialState: 'CAPTURED',
-            lastEvent: {
-              event: 'FULFILLMENT_CAPTURED',
-              desc: `Verified compliant dispatch. Live capture of $${captureAmount} executed on PayPal rails (Capture ID: ${cap.captureId}).`
-            }
-          };
-        }
-      } catch (err) {
-        order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
-        ledgerUpdate = {
-          heldAmount: order.heldAmount,
-          capturedAmount: '0.00',
-          financialState: 'POLICY_APPROVED_FOR_CAPTURE',
-          lastEvent: {
-            event: 'POLICY_APPROVED',
-            desc: `Compliant fulfillment verified. Capture attempted but rail error occurred: ${err.message}`
-          }
-        };
+    // Audit-only UI helper: never executes PayPal capture without signed webhook or buyer settlement
+    order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
+    ledgerUpdate = {
+      heldAmount: order.heldAmount,
+      capturedAmount: '0.00',
+      financialState: 'POLICY_APPROVED_FOR_CAPTURE',
+      lastEvent: {
+        event: 'POLICY_APPROVED',
+        desc: `Audit-only preview: Compliant fulfillment verified for $${captureAmount}. Actual capture requires signed /api/webhooks/fulfillment.`
       }
-    } else {
-      // Baseline authorization was voided as permanent test evidence
-      order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
-      ledgerUpdate = {
-        heldAmount: order.heldAmount,
-        capturedAmount: '0.00',
-        financialState: 'POLICY_APPROVED_FOR_CAPTURE',
-        lastEvent: {
-          event: 'POLICY_APPROVED',
-          desc: `Compliant fulfillment verified. Order approved for full $${captureAmount} capture. (PayPal auth ${order.authorizationId} status: ${liveAuthStatus}).`
-        }
-      };
-    }
+    };
   } else {
     order.financialState = 'HOLD_FROZEN';
     ledgerUpdate = {

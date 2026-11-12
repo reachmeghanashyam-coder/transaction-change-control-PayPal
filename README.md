@@ -12,7 +12,7 @@
 * **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R) *(Note: Sandbox tokens require interactive payer approval before conversion to authorizations; fresh tokens can be generated via `npm run agent:demo`).*
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`, verified on `api-m.sandbox.paypal.com`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
-* **Automated Test Suite:** **16 Passed, 0 Failed** via `npm test` (3 live API integration tests [2 PayPal REST Sandbox + 1 Gemini 3.5 Flash] + 13 deterministic policy, security & Express route integration tests).
+* **Automated Test Suite:** **21 Passed, 0 Failed** via `npm test` (live PayPal Sandbox & Gemini API checks + deterministic policy, security, authorization & Express route tests).
 
 ### How to Independently Verify the Invariant Breach & Ledger Audit Trail:
 To inspect how an inbound fulfillment mismatch activates the settlement freeze gate and verify the permanent sandbox void record:
@@ -65,7 +65,7 @@ TCC addresses this gap.
 
 ### Verified Judge Evidence Vault (Live PayPal Rails)
 ![Judge Evidence Vault](docs/screenshots/05_judge_evidence_vault.png)
-*Live PayPal Orders v2 Order ID `36S14862Y66466816` and Authorization ID `7VU467051N1536501` verified against sandbox ledger with 14/14 automated tests passing.*
+*Live PayPal Orders v2 Order ID `36S14862Y66466816` and Authorization ID `7VU467051N1536501` verified against sandbox ledger with 21/21 automated tests passing.*
 
 ---
 
@@ -157,7 +157,7 @@ Any judge or developer can verify the system in under 60 seconds:
 ```bash
 # 1. Run Automated Test Suite
 npm test
-# Output: 16 Passed (3 live API integration tests [2 PayPal Sandbox + 1 Gemini GenAI] + 13 deterministic policy, route & security tests)
+# Output: 21 Passed, 0 Failed
 
 # Run Live Server Route Integration Probe
 npm run test:live:server

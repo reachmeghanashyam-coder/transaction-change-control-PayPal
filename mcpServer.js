@@ -87,7 +87,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'tcc_enforce_settlement',
-        description: 'Enforces final settlement on PayPal Orders v2 rails: CAPTURE payment if compliant, or permanently VOID authorization hold if breached.',
+        description: 'Trusted local-agent stdio tool: executes CAPTURE or VOID on PayPal Orders v2 rails. Note: this local MCP interface operates directly on the supplied authorizationId and does not enforce the REST API order-to-authorization binding.',
         inputSchema: {
           type: 'object',
           properties: {

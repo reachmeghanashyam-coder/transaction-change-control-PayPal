@@ -4,13 +4,14 @@
 // Connected directly to Live Gemini 3.5 Flash & PayPal REST v2 Sandbox APIs
 // ==========================================================================
 
+const SANDBOX_ORDER_ID = '36S14862Y66466816';
 const SANDBOX_AUTH_ID = '7VU467051N1536501';
 
 const SCENARIOS = {
   1: {
     id: 1,
     name: 'Clean Dispatch',
-    replayMeta: 'ACT 4 OF 4 · AUTO-SETTLED',
+    replayMeta: 'SCENARIO PREVIEW · COMPLIANT',
     whImg: '/assets/shoe_dark_cutout.png',
     whGlowClass: 'ambient-radial glow-green',
     whTitle: 'Nike Pegasus Trail 4',
@@ -27,12 +28,12 @@ const SCENARIOS = {
     conduitRightColor: 'var(--accent-emerald)',
     vaultClass: 'captured',
     vaultBadgeClass: 'gate-state-badge badge-green',
-    vaultBadgeText: 'STATUS: FULL CAPTURE SETTLED ($135.00)',
-    vaultSubtext: 'Payment released to merchant via PayPal Orders v2 capture. Order in transit.',
+    vaultBadgeText: 'SCENARIO PREVIEW · POLICY APPROVED ($135.00)',
+    vaultSubtext: 'Scenario preview: Policy approved full capture. (Sandbox auth 7VU467051N1536501 is VOIDED).',
     showVoidBtn: false,
     showAcceptBtn: false,
-    proofStatus: 'CAPTURED',
-    proofCaptured: '$135.00',
+    proofStatus: 'VOIDED',
+    proofCaptured: '$0.00',
     tlStep3Text: 'Warehouse Event',
     tlStep4Text: 'Settlement: Capture ($135.00)',
     slipText: 'PACKING SLIP #4092: Dispatched Nike Pegasus Trail 4 (100% GORE-TEX Certified Waterproof Membrane). Total $135.00 USD.'
@@ -195,18 +196,19 @@ async function switchScenario(scenarioId) {
     const auditTextEl = document.getElementById('auditAnalysisText');
     auditTextEl.innerHTML = '<span class="text-cyan font-mono">Auditing via Gemini 3.5 Flash...</span>';
 
-    fetch('/api/webhooks/fulfillment', {
+    fetch('/api/webhook/fulfillment-ingest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        orderId: SANDBOX_ORDER_ID,
         slipText: scDef.slipText,
-        warehouseId: scDef.whSlipId,
-        packingSlipId: '#4092'
+        eventType: scDef.id === 1 ? 'CLEAN' : 'BREACH',
+        proposedPrice: scDef.id === 3 ? '110.00' : undefined
       })
     }).then(r => r.json()).then(data => {
-      if (data && data.result && data.result.aiExtraction) {
-        const ai = data.result.aiExtraction;
-        auditTextEl.innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">Gemini 3.5 Flash (${ai.latencyMs}ms):</span> ${ai.attributes.riskExplanation || (scDef.id === 1 ? '✓ Verified Compliant' : '⚠️ Breach Detected')}`;
+      if (data && data.aiExtraction) {
+        const ai = data.aiExtraction;
+        auditTextEl.innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">Gemini 3.5 Flash (${ai.latencyMs || 0}ms):</span> ${ai.attributes?.riskExplanation || (scDef.id === 1 ? '✓ Verified Compliant' : '⚠️ Breach Detected')}`;
       } else {
         auditTextEl.innerText = scDef.auditAnalysis;
       }
@@ -258,9 +260,9 @@ async function switchScenario(scenarioId) {
 
     updateTimelineStep(4, (scDef.showVoidBtn || scDef.showAcceptBtn) ? 'active' : 'completed', scDef.tlStep4Text);
 
-    // Update bottom evidence proof drawer
-    document.getElementById('proofStateText').innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">${scDef.proofStatus}</span>`;
-    document.getElementById('proofCapturedVal').innerText = scDef.proofCaptured;
+    // Update bottom evidence proof drawer (preserve true VOIDED sandbox record)
+    document.getElementById('proofStateText').innerHTML = `<span class="text-rose font-semibold">VOIDED</span>`;
+    document.getElementById('proofCapturedVal').innerText = '$0.00';
 
     updateReplayIndicator(scDef.replayMeta);
   }, 2000);
@@ -321,7 +323,7 @@ async function triggerVoidAction() {
     const res = await fetch('/api/orders/settle-action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'VOID', authorizationId: SANDBOX_AUTH_ID })
+      body: JSON.stringify({ orderId: SANDBOX_ORDER_ID, action: 'VOID', authorizationId: SANDBOX_AUTH_ID })
     });
     const data = await res.json();
     if (btn) btn.disabled = false;
@@ -373,7 +375,7 @@ async function triggerAcceptDiscount() {
     const res = await fetch('/api/orders/settle-action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'CAPTURE_DISCOUNT', amount: '110.00', authorizationId: SANDBOX_AUTH_ID })
+      body: JSON.stringify({ orderId: SANDBOX_ORDER_ID, action: 'CAPTURE_DISCOUNT', amount: '110.00', authorizationId: SANDBOX_AUTH_ID })
     });
     const data = await res.json();
     if (btn) btn.disabled = false;
