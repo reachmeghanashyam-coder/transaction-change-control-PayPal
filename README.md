@@ -12,7 +12,7 @@
 * **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R) *(Note: Sandbox tokens require interactive payer approval before conversion to authorizations; fresh tokens can be generated via `npm run agent:demo`).*
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`, verified on `api-m.sandbox.paypal.com`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
-* **Automated Test Suite:** **14 Passed, 0 Failed** via `npm test` (3 live API integration tests [2 PayPal REST Sandbox + 1 Gemini 3.5 Flash] + 11 deterministic policy & security tests).
+* **Automated Test Suite:** **16 Passed, 0 Failed** via `npm test` (3 live API integration tests [2 PayPal REST Sandbox + 1 Gemini 3.5 Flash] + 13 deterministic policy, security & Express route integration tests).
 
 ### How to Independently Verify the Correlated Mismatch-to-Void Workflow:
 To prove the causal link connecting the buyer mandate, warehouse packing slip mismatch, and the resulting PayPal Sandbox void:
@@ -28,7 +28,7 @@ This executes `scripts/verify_audit_trail.js`, querying `api-m.sandbox.paypal.co
 > **Note on PayPal Orders v2 Sandbox Evaluation & Strict Financial Rails:**
 > 1. **Payer Approval Boundary:** In PayPal sandbox, creating an order with `intent: AUTHORIZE` generates an unapproved order token (`npm run agent:demo` / `npm run test:paypal:live`). Because converting an order into an active authorization requires interactive browser authentication, authorization record `7VU467051N1536501` serves as the verified, permanent ledger artifact for inspecting voided authorization status without requiring manual payer login during automated test runs.
 > 2. **Zero False Success Guarantee:** TCC strictly couples local financial state to PayPal API verification. A failed or rejected PayPal API call immediately returns an error, halts the pipeline, and NEVER mutates local ledger state or manufactures synthetic IDs.
-> 3. **Strict Webhook HMAC:** Enterprise fulfillment webhooks strictly enforce raw-byte HMAC-SHA256 signature verification (`X-TCC-Signature` or `X-Shopify-Hmac-Sha256`); unsigned or mismatched payloads are rejected with HTTP 401.
+> 3. **Strict Webhook HMAC & Order Association:** Enterprise fulfillment webhooks strictly enforce raw-byte HMAC-SHA256 signature verification (`X-TCC-Signature`); unsigned, mismatched, or unassociated order payloads are rejected with HTTP 401 / 404.
 
 ---
 
@@ -157,7 +157,10 @@ Any judge or developer can verify the system in under 60 seconds:
 ```bash
 # 1. Run Automated Test Suite
 npm test
-# Output: 14 Passed (3 live API integration tests [2 PayPal Sandbox + 1 Gemini GenAI] + 11 deterministic policy tests)
+# Output: 16 Passed (3 live API integration tests [2 PayPal Sandbox + 1 Gemini GenAI] + 13 deterministic policy, route & security tests)
+
+# Run Live Server Route Integration Probe
+npm run test:live:server
 
 # 2. Run Standalone PayPal Order Creation Probe (Hits live sandbox)
 npm run test:paypal:live

@@ -1,14 +1,20 @@
 // tests/test_lifecycles.js
-// Automated Test Harness verifying the 3 Financial Lifecycles, Fail-Closed Security, and AI Policy Gate
+// Automated Integration & Policy Test Harness verifying Financial Lifecycles,
+// Fail-Closed Security, Express Routes, Strict Webhook HMAC, and PayPal Rails.
+
+process.env.TCC_WEBHOOK_SECRET = process.env.TCC_WEBHOOK_SECRET || 'whsec_test_suite_secret_2026';
 
 const assert = require('assert');
+const crypto = require('crypto');
+const http = require('http');
 const policyEngine = require('../services/policyEngine');
 const paypal = require('../services/paypal');
 const aiExtractor = require('../services/aiExtractor');
+const { app, ordersRegistry } = require('../server');
 
 async function runTests() {
   console.log('================================================================');
-  console.log('   TCC TEST SUITE: 3 FINANCIAL LIFECYCLES & POLICY ENGINE      ');
+  console.log('   TCC TEST SUITE: FINANCIAL LIFECYCLES, RAILS & ROUTES        ');
   console.log('================================================================\n');
 
   let passed = 0;
@@ -84,7 +90,7 @@ async function runTests() {
     assert.strictEqual(result.requiresConsent, false);
   });
 
-  // 2. Fail-Closed Security Tests (Crucial for Judge Defense)
+  // 2. Fail-Closed Security Tests
   console.log('\n[2/4] FAIL-CLOSED DEFENSIVE GATE VERIFICATION');
 
   test('Malformed / Corrupt OCR slip triggers UNKNOWN and fails closed (hold frozen)', () => {
@@ -138,47 +144,123 @@ async function runTests() {
     assert.strictEqual(verified.amount, '135.00');
   });
 
-  // 4. Webhook & MCP Verification
-  console.log('\n[4/4] WEBHOOK, MCP & PRE-PURCHASE ARCHITECTURE VERIFICATION');
+  // 4. Express Routes & Webhook Integration Tests (Reviewer Priority #5)
+  console.log('\n[4/4] EXPRESS ROUTES & STRICT WEBHOOK INTEGRATION VERIFICATION');
 
-  test('Pre-Purchase Guardrail rejects transactions exceeding price ceilings', () => {
-    const isPriceSafe = 150.00 <= 135.00;
-    assert.strictEqual(isPriceSafe, false, 'Breaches budget limit');
+  // Boot ephemeral server on dynamic port
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
   });
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const secret = process.env.TCC_WEBHOOK_SECRET;
 
-  test('Pre-Purchase Guardrail flags deceptive seller substitution terms', () => {
-    const sellerTerms = 'Seller reserves the right to substitute with equivalent item at our sole discretion.';
-    const termsLower = sellerTerms.toLowerCase();
-    const hasUncheckedSub = termsLower.includes('substitut') || termsLower.includes('equivalent item');
-    assert.strictEqual(hasUncheckedSub, true, 'Flags sneaky substitution clauses before checkout');
-  });
+  try {
+    await testAsync('Route GET /health returns HTTP 200 with HEALTHY status', async () => {
+      const res = await fetch(`${baseUrl}/health`);
+      assert.strictEqual(res.status, 200);
+      const json = await res.json();
+      assert.strictEqual(json.status, 'HEALTHY');
+      assert.strictEqual(json.service, 'tcc-paypal-gateway');
+    });
 
-  test('MCP server definition registers tools for AI agents', () => {
-    const mcp = require('../mcpServer');
-    assert.ok(mcp, 'MCP Server module exported');
-    assert.strictEqual(typeof mcp.setRequestHandler, 'function', 'MCP Server implements SDK request handlers');
-  });
+    await testAsync('Route POST /api/guardrails/pre-purchase flags price ceiling breach', async () => {
+      const res = await fetch(`${baseUrl}/api/guardrails/pre-purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cartPrice: 150.00, maxPriceBudget: 135.00 })
+      });
+      assert.strictEqual(res.status, 200);
+      const json = await res.json();
+      assert.strictEqual(json.passed, false);
+      assert.strictEqual(json.status, 'REJECTED_GUARDRAIL_BREACH');
+      assert.ok(json.violations[0].includes('Price ceiling breached'));
+    });
 
-  test('Cryptographic HMAC-SHA256 signature verification validates authentic warehouse payloads', () => {
-    const crypto = require('crypto');
-    const secret = 'whsec_tcc_paypal_sandbox_2026';
-    const payload = JSON.stringify({ slipText: 'Test Slip', warehouseId: 'WMS-01' });
-    const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-    const verify = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-    assert.strictEqual(signature, verify, 'HMAC signature matches expected cryptographic digest');
-  });
+    await testAsync('Route POST /api/guardrails/pre-purchase flags unilateral substitution terms', async () => {
+      const res = await fetch(`${baseUrl}/api/guardrails/pre-purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cartPrice: 135.00,
+          maxPriceBudget: 135.00,
+          merchantTerms: 'Seller reserves right to substitute with equivalent item at sole discretion.'
+        })
+      });
+      assert.strictEqual(res.status, 200);
+      const json = await res.json();
+      assert.strictEqual(json.passed, false);
+      assert.ok(json.violations.some(v => v.includes('unilateral substitution clause')));
+    });
 
-  test('Shopify native fulfillment payload (orders/fulfilled) parses into verified slip text', () => {
-    const shopifyPayload = {
-      order_id: 994821,
-      tracking_number: '1Z9999999999999999',
-      line_items: [{ title: 'Nike Pegasus Trail 4', variant_title: 'US 10.0 / Mesh', sku: 'NK-MSH' }]
-    };
-    const item = shopifyPayload.line_items[0];
-    const text = `SHOPIFY FULFILLMENT #${shopifyPayload.order_id}: Dispatched ${item.title} (${item.variant_title}). SKU: ${item.sku}.`;
-    assert.ok(text.includes('SHOPIFY FULFILLMENT'));
-    assert.ok(text.includes('NK-MSH'));
-  });
+    await testAsync('Webhook Route: rejects unsigned request with HTTP 401', async () => {
+      const res = await fetch(`${baseUrl}/api/webhooks/fulfillment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slipText: 'Sample slip', orderId: '36S14862Y66466816' })
+      });
+      assert.strictEqual(res.status, 401);
+      const json = await res.json();
+      assert.ok(json.error.includes('Missing required X-TCC-Signature'));
+    });
+
+    await testAsync('Webhook Route: rejects invalid HMAC signature with HTTP 401', async () => {
+      const res = await fetch(`${baseUrl}/api/webhooks/fulfillment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-TCC-Signature': '0000000000000000000000000000000000000000000000000000000000000000'
+        },
+        body: JSON.stringify({ slipText: 'Sample slip', orderId: '36S14862Y66466816' })
+      });
+      assert.strictEqual(res.status, 401);
+      const json = await res.json();
+      assert.ok(json.error.includes('signature verification failed'));
+    });
+
+    await testAsync('Webhook Route: rejects unregistered orderId with HTTP 404', async () => {
+      const payload = JSON.stringify({ slipText: 'Sample slip', orderId: 'UNKNOWN_ORDER_999' });
+      const validSig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+      const res = await fetch(`${baseUrl}/api/webhooks/fulfillment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-TCC-Signature': validSig
+        },
+        body: payload
+      });
+      assert.strictEqual(res.status, 404);
+      const json = await res.json();
+      assert.ok(json.error.includes('ORDER_NOT_FOUND'));
+    });
+
+    await testAsync('Webhook Route: verifies authentic HMAC, associates registered order, and triggers breach freeze', async () => {
+      const payload = JSON.stringify({
+        orderId: '36S14862Y66466816',
+        slipText: 'PACKING SLIP #4092: Dispatched Nike Pegasus 4 (Open-Hole Mesh Upper).',
+        packingSlipId: '#4092'
+      });
+      const validSig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+      const res = await fetch(`${baseUrl}/api/webhooks/fulfillment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-TCC-Signature': validSig
+        },
+        body: payload
+      });
+      assert.strictEqual(res.status, 200);
+      const json = await res.json();
+      assert.strictEqual(json.success, true);
+      assert.strictEqual(json.result.isCompliant, false);
+      assert.strictEqual(json.result.actionTaken, 'PAYPAL_HOLD_FROZEN_PENDING_BUYER');
+    });
+
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 
   console.log('\n================================================================');
   console.log(`   TEST RUN COMPLETE: ${passed} PASSED, ${failed} FAILED       `);

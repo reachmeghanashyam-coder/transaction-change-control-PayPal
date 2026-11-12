@@ -23,6 +23,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 const ordersRegistry = new Map();
 const sseClients = [];
 
+// Pre-register baseline order for demonstration and testing
+ordersRegistry.set('36S14862Y66466816', {
+  orderId: '36S14862Y66466816',
+  authorizationId: '7VU467051N1536501',
+  financialState: 'HOLD_LOCKED',
+  heldAmount: '135.00',
+  capturedAmount: '0.00',
+  approvedBaseline: {
+    product: 'Nike Pegasus Trail 4 GORE-TEX (Size 10 US)',
+    price: '135.00',
+    mandate: {
+      waterproofRequired: true,
+      mandateText: '100% Certified Waterproof GORE-TEX Membrane'
+    }
+  },
+  auditLog: []
+});
+
 function getOrCreateOrder(orderId = 'default_order') {
   if (!ordersRegistry.has(orderId)) {
     ordersRegistry.set(orderId, {
@@ -170,41 +188,45 @@ app.get('/api/events', (req, res) => {
 });
 
 // 3. Enterprise Webhook Ingestion Engine (/api/webhooks/fulfillment)
-// Supports Native Shopify ('orders/fulfilled') & ShipBob ('order.shipment.packed') payloads
-// with strict raw-buffer cryptographic HMAC-SHA256 signature verification
-const WEBHOOK_SECRET = process.env.TCC_WEBHOOK_SECRET || 'whsec_tcc_paypal_sandbox_2026';
-
+// Ingests fulfillment notifications with strict raw-buffer cryptographic HMAC-SHA256 signature verification
 app.post('/api/webhooks/fulfillment', async (req, res) => {
-  const signature = req.headers['x-tcc-signature'] || req.headers['x-shopify-hmac-sha256'] || req.headers['x-shipbob-signature'];
-  const body = req.body;
+  const webhookSecret = process.env.TCC_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('[WMS CONFIG ERROR] TCC_WEBHOOK_SECRET is not configured on the gateway environment.');
+    return res.status(500).json({ error: 'SERVER_MISCONFIGURATION: TCC_WEBHOOK_SECRET is not configured on gateway.' });
+  }
 
-  // Strict Webhook Authentication (Reviewer Priority #2: Reject unsigned events)
+  const signature = req.headers['x-tcc-signature'];
   if (!signature) {
-    console.warn('[WMS SECURITY REJECTION] Missing webhook cryptographic signature header.');
+    console.warn('[WMS SECURITY REJECTION] Missing X-TCC-Signature header.');
     return res.status(401).json({
-      error: 'UNAUTHORIZED: Missing required webhook cryptographic signature header (X-TCC-Signature, X-Shopify-Hmac-Sha256, or X-ShipBob-Signature).'
+      error: 'UNAUTHORIZED: Missing required X-TCC-Signature cryptographic header.'
     });
   }
 
   // Cryptographic HMAC-SHA256 Verification against raw request bytes
   const rawPayload = req.rawBody || Buffer.from(JSON.stringify(req.body));
-  const expectedHex = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawPayload).digest('hex');
-  const expectedBase64 = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawPayload).digest('base64');
-
+  const expectedHex = crypto.createHmac('sha256', webhookSecret).update(rawPayload).digest('hex');
   const sigBuffer = Buffer.from(signature);
   const hexBuffer = Buffer.from(expectedHex);
-  const b64Buffer = Buffer.from(expectedBase64);
 
-  const isValidHex = sigBuffer.length === hexBuffer.length && crypto.timingSafeEqual(sigBuffer, hexBuffer);
-  const isValidB64 = sigBuffer.length === b64Buffer.length && crypto.timingSafeEqual(sigBuffer, b64Buffer);
-
-  if (!isValidHex && !isValidB64) {
+  if (sigBuffer.length !== hexBuffer.length || !crypto.timingSafeEqual(sigBuffer, hexBuffer)) {
     console.warn(`[WMS SECURITY REJECTION] Invalid HMAC signature provided: ${signature}`);
     return res.status(401).json({ error: 'UNAUTHORIZED: Cryptographic HMAC-SHA256 signature verification failed.' });
   }
 
+  const body = req.body;
+
+  // Strict Order Association (Reviewer Priority #3: Require registered orderId)
+  const orderId = body.orderId;
+  if (!orderId || !ordersRegistry.has(orderId)) {
+    return res.status(404).json({ 
+      error: 'ORDER_NOT_FOUND: Webhook specifies missing or unregistered orderId. A valid registered order is required.' 
+    });
+  }
+  const order = ordersRegistry.get(orderId);
+
   // 1. Universal Multi-Platform Payload Normalization:
-  // Handles raw slipText OR structured Shopify Fulfillment JSON OR ShipBob ASN JSON
   let extractedSlipText = body.slipText;
   let warehouseSource = body.warehouseId || 'SneakerDepot NYC';
   let trackingId = body.trackingNumber || '1Z9999999999999999';
@@ -230,8 +252,7 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
     });
   }
 
-  const order = getOrCreateOrder(body.orderId || 'default_order');
-  console.log(`[WMS WEBHOOK RECEIVED] Source: ${warehouseSource} | Tracking: ${trackingId} | Auth: HMAC_VERIFIED (Strict)`);
+  console.log(`[WMS WEBHOOK RECEIVED] Order: ${orderId} | Source: ${warehouseSource} | Tracking: ${trackingId} | Auth: HMAC_VERIFIED (Strict)`);
 
   // 2. Run AI Extraction with 3-tier resilient failover
   let aiExtraction;
@@ -262,11 +283,10 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 
   const isCompliant = evaluation.verdict === 'COMPLIANT_FULFILLMENT';
 
-  // 3. Update isolated order state with verified rail checks (Reviewer Priority #3)
+  // 3. Update isolated order state with verified rail checks
   let settlementOutcome = null;
 
   if (isCompliant) {
-    // Attempt actual capture if active authorization exists on PayPal rails
     try {
       const liveAuth = await paypal.getAuthorization(order.authorizationId);
       if (liveAuth.success && (liveAuth.authStatus === 'CREATED' || liveAuth.authStatus === 'AUTHORIZED')) {
@@ -280,6 +300,15 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
             captureId: cap.captureId,
             message: `Full capture of $135.00 confirmed on PayPal rails (Capture ID: ${cap.captureId}).`
           };
+        } else {
+          // PayPal capture failed - report failure, do NOT return 200 success
+          order.financialState = 'CAPTURE_FAILED';
+          return res.status(502).json({
+            success: false,
+            error: 'PAYPAL_CAPTURE_FAILED: Live capture was rejected by PayPal rails',
+            details: cap.raw,
+            financialState: order.financialState
+          });
         }
       } else {
         // Transparent disclosure: baseline sandbox authorization was previously voided for audit trail
@@ -288,15 +317,16 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
         settlementOutcome = {
           railStatus: 'POLICY_APPROVED_FOR_CAPTURE',
           authStatus: liveAuth.authStatus || 'RECORD_VERIFIED',
-          message: `Evaluation verdict: COMPLIANT_FULFILLMENT. Policy approved full $135.00 capture. (PayPal auth ${order.authorizationId} status: ${liveAuth.authStatus || 'VOIDED'}).`
+          message: `Evaluation verdict: COMPLIANT_FULFILLMENT. Policy approved full $135.00 capture. (PayPal auth ${order.authorizationId} status: ${liveAuth.authStatus || 'VOIDED'}; capture not dispatched against voided record).`
         };
       }
     } catch (e) {
-      order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
-      settlementOutcome = {
-        railStatus: 'POLICY_APPROVED_FOR_CAPTURE',
-        message: `Evaluation verdict: COMPLIANT_FULFILLMENT. Policy gate approved. Rail verification notice: ${e.message}`
-      };
+      order.financialState = 'CAPTURE_ERROR';
+      return res.status(502).json({
+        success: false,
+        error: `PAYPAL_RAIL_ERROR: ${e.message}`,
+        financialState: order.financialState
+      });
     }
   } else {
     order.financialState = 'HOLD_FROZEN';
@@ -325,9 +355,6 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    result: webhookResult
-  });
-});
     result: webhookResult
   });
 });
@@ -670,13 +697,18 @@ app.get('/api-spec.json', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`   TCC Settlement Gateway running on port ${PORT}   `);
-  console.log(`   Healthcheck: http://localhost:${PORT}/health     `);
-  console.log(`   API Docs:    http://localhost:${PORT}/docs       `);
-  console.log(`====================================================`);
+let serverInstance = null;
+if (require.main === module) {
+  serverInstance = app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`   TCC Settlement Gateway running on port ${PORT}   `);
+    console.log(`   Healthcheck: http://localhost:${PORT}/health     `);
+    console.log(`   API Docs:    http://localhost:${PORT}/docs       `);
+    console.log(`====================================================`);
 
-  // Render Free-Tier preservation: Natural sleep mode enabled to conserve compute hours through Dec 22.
-  // Render automatically boots on incoming requests without exhausting monthly allocations.
-});
+    // Render Free-Tier preservation: Natural sleep mode enabled to conserve compute hours through Dec 22.
+    // Render automatically boots on incoming requests without exhausting monthly allocations.
+  });
+}
+
+module.exports = { app, ordersRegistry, getOrCreateOrder };
