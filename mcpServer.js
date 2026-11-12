@@ -14,7 +14,7 @@ const server = new Server(
   {
     name: 'tcc-paypal-rails',
     version: '1.0.0',
-    description: 'Transaction Change Control on PayPal Rails — Autonomous Escrow Governance for AI Shopping Agents'
+    description: 'Transaction Change Control on PayPal Rails — Fulfillment Governance for AI Shopping Agents'
   },
   {
     capabilities: {
@@ -48,7 +48,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'tcc_create_mandate_order',
-        description: 'Creates an intent: AUTHORIZE escrow order on PayPal Orders v2 rails with buyer mandate locking. Merchant cannot capture without verified compliance.',
+        description: 'Creates an intent: AUTHORIZE order on PayPal Orders v2 rails with buyer mandate locking. Merchant cannot capture without verified compliance.',
         inputSchema: {
           type: 'object',
           properties: {

@@ -35,7 +35,7 @@ async function extractWarehouseSlipAttributes(slipText, targetMandate) {
   }
 
   // Tier 1 & Tier 2: Attempt primary and fallback Google GenAI models
-  const candidateModels = ['gemini-3.5-flash', 'gemini-2.5-flash'];
+  const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.5-flash'];
   let lastError = null;
 
   for (const modelName of candidateModels) {

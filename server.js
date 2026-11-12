@@ -56,7 +56,7 @@ app.get('/health', (req, res) => {
     status: 'HEALTHY',
     service: 'tcc-paypal-gateway',
     version: '1.0.0',
-    pipeline: 'Phase 1 Pre-Purchase Guardrail -> Phase 2 Escrow Hold -> Phase 3 Warehouse Audit -> Phase 4 Settlement',
+    pipeline: 'Phase 1 Pre-Purchase Guardrail -> Phase 2 Authorization Hold -> Phase 3 Warehouse Audit -> Phase 4 Settlement',
     multiTenantOrdersActive: ordersRegistry.size,
     paypalEndpoint: 'api-m.sandbox.paypal.com',
     aiEngine: 'gemini-3.5-flash (Google Gen AI SDK)',
