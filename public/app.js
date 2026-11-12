@@ -152,7 +152,7 @@ async function switchScenario(scenarioId) {
 
   updateReplayIndicator(`EVENT 0${scDef.id}: INBOUND WAREHOUSE SHIPMENT ARRIVING...`);
 
-  // BEAT 2 (0.4s): Pulse travels from warehouse & warehouse card reveals
+  // BEAT 2 (0.8s): Pulse travels from warehouse & warehouse card reveals
   const t1 = setTimeout(() => {
     const pulse = document.getElementById('pulseRight');
     pulse.style.background = scDef.id === 1 
@@ -162,7 +162,7 @@ async function switchScenario(scenarioId) {
     pulse.animate([
       { right: '0%', opacity: 1 },
       { right: '100%', opacity: 0 }
-    ], { duration: 600, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' });
+    ], { duration: 850, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' });
 
     document.getElementById('labelRight').style.color = scDef.conduitRightColor;
 
@@ -214,10 +214,10 @@ async function switchScenario(scenarioId) {
       auditTextEl.innerText = scDef.auditAnalysis;
     });
 
-  }, 400);
+  }, 800);
   activeTimeouts.push(t1);
 
-  // BEAT 3 (1.1s): PayPal Gate Enforces Settlement Policy (Capture, Freeze, or Offer)
+  // BEAT 3 (2.0s): PayPal Gate Enforces Settlement Policy (Capture, Freeze, or Offer)
   const t2 = setTimeout(() => {
     nodePaypal.classList.remove('state-captured', 'state-frozen', 'state-offer', 'state-voided');
     if (scDef.id === 1) nodePaypal.classList.add('state-captured');
@@ -263,7 +263,7 @@ async function switchScenario(scenarioId) {
     document.getElementById('proofCapturedVal').innerText = scDef.proofCaptured;
 
     updateReplayIndicator(scDef.replayMeta);
-  }, 1100);
+  }, 2000);
   activeTimeouts.push(t2);
 }
 
