@@ -30,6 +30,8 @@ ordersRegistry.set('36S14862Y66466816', {
   financialState: 'HOLD_LOCKED',
   heldAmount: '135.00',
   capturedAmount: '0.00',
+  authorizedAmount: '135.00',
+  currency: 'USD',
   approvedBaseline: {
     product: 'Nike Pegasus Trail 4 GORE-TEX (Size 10 US)',
     price: '135.00',
@@ -49,6 +51,8 @@ function getOrCreateOrder(orderId = '36S14862Y66466816') {
       financialState: 'UNINITIALIZED',
       heldAmount: '0.00',
       capturedAmount: '0.00',
+      authorizedAmount: '0.00',
+      currency: 'USD',
       approvedBaseline: {
         product: 'Unspecified Product',
         price: 0.00,
@@ -150,6 +154,9 @@ app.post('/api/orders/create-mandate', async (req, res) => {
     const orderId = order.orderId;
     const internalOrder = getOrCreateOrder(orderId);
     internalOrder.orderId = orderId;
+    internalOrder.authorizedAmount = String(parseFloat(amount).toFixed(2));
+    internalOrder.heldAmount = String(parseFloat(amount).toFixed(2));
+    internalOrder.currency = currency || 'USD';
     internalOrder.approvedBaseline.product = product;
     internalOrder.approvedBaseline.price = parseFloat(amount);
     internalOrder.approvedBaseline.mandate.mandateText = mandateText;
@@ -170,6 +177,64 @@ app.post('/api/orders/create-mandate', async (req, res) => {
   } catch (err) {
     console.error('[API ORDER CREATE ERROR]:', err.message);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// 1.3 Phase 2: Authorize/Bind Order on PayPal Rails
+// Once buyer approves the order via approveLink, authorize the hold and bind authorizationId to order
+app.post('/api/orders/authorize', async (req, res) => {
+  const { orderId, authorizationId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ error: 'Missing required orderId' });
+  }
+
+  if (!ordersRegistry.has(orderId)) {
+    return res.status(404).json({ error: `ORDER_NOT_FOUND: Order ${orderId} does not exist.` });
+  }
+
+  const order = ordersRegistry.get(orderId);
+
+  // If authorizationId is directly provided (e.g. from client-side PayPal SDK onApprove)
+  if (authorizationId) {
+    order.authorizationId = authorizationId;
+    order.financialState = 'HOLD_LOCKED';
+    return res.json({
+      success: true,
+      orderId,
+      authorizationId: order.authorizationId,
+      financialState: order.financialState,
+      heldAmount: order.heldAmount
+    });
+  }
+
+  // Otherwise, authorize via server-side PayPal Orders v2 authorize API
+  try {
+    const authResult = await paypal.authorizeOrder(orderId);
+    if (!authResult.success || !authResult.authorizationId) {
+      return res.status(authResult.status && authResult.status >= 400 ? authResult.status : 502).json({
+        success: false,
+        error: 'PAYPAL_AUTHORIZATION_FAILED: Unable to authorize order on PayPal rails',
+        details: authResult.raw
+      });
+    }
+
+    order.authorizationId = authResult.authorizationId;
+    order.financialState = 'HOLD_LOCKED';
+    if (authResult.amount?.value) {
+      order.authorizedAmount = String(parseFloat(authResult.amount.value).toFixed(2));
+      order.heldAmount = order.authorizedAmount;
+    }
+
+    return res.json({
+      success: true,
+      orderId,
+      authorizationId: order.authorizationId,
+      financialState: order.financialState,
+      heldAmount: order.heldAmount
+    });
+  } catch (err) {
+    return res.status(500).json({ error: `PAYPAL_AUTHORIZE_ERROR: ${err.message}` });
   }
 });
 app.get('/api/events', (req, res) => {
@@ -221,7 +286,7 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 
   const body = req.body;
 
-  // Strict Order Association (Reviewer Priority #3: Require registered orderId)
+  // Strict Order Association (Reviewer Priority #3 & Final Integrity Audit: Require registered orderId with valid PayPal authorization)
   const orderId = body.orderId;
   if (!orderId || !ordersRegistry.has(orderId)) {
     return res.status(404).json({ 
@@ -229,6 +294,13 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
     });
   }
   const order = ordersRegistry.get(orderId);
+
+  // Require established PayPal authorization before proceeding to fulfillment settlement
+  if (!order.authorizationId) {
+    return res.status(409).json({
+      error: 'ORDER_NOT_AUTHORIZED: Order has no active PayPal authorization. Buyer approval and authorization hold required before fulfillment.'
+    });
+  }
 
   // 1. Universal Multi-Platform Payload Normalization:
   let extractedSlipText = body.slipText;
@@ -289,20 +361,21 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 
   // 3. Update isolated order state with verified rail checks
   let settlementOutcome = null;
+  const authorizedCaptureAmount = order.authorizedAmount || order.heldAmount || '135.00';
 
   if (isCompliant) {
     try {
       const liveAuth = await paypal.getAuthorization(order.authorizationId);
       if (liveAuth.success && (liveAuth.authStatus === 'CREATED' || liveAuth.authStatus === 'AUTHORIZED')) {
-        const cap = await paypal.captureAuthorization(order.authorizationId, '135.00', true);
+        const cap = await paypal.captureAuthorization(order.authorizationId, authorizedCaptureAmount, true);
         if (cap.success && cap.captureId) {
           order.financialState = 'CAPTURED';
-          order.capturedAmount = '135.00';
+          order.capturedAmount = authorizedCaptureAmount;
           order.heldAmount = '0.00';
           settlementOutcome = {
             railStatus: 'CAPTURED_ON_PAYPAL_RAILS',
             captureId: cap.captureId,
-            message: `Full capture of $135.00 confirmed on PayPal rails (Capture ID: ${cap.captureId}).`
+            message: `Full capture of $${authorizedCaptureAmount} confirmed on PayPal rails (Capture ID: ${cap.captureId}).`
           };
         } else {
           // PayPal capture failed - report failure, do NOT return 200 success
@@ -317,11 +390,11 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
       } else {
         // Transparent disclosure: baseline sandbox authorization was previously voided for audit trail
         order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
-        order.heldAmount = '135.00';
+        order.heldAmount = authorizedCaptureAmount;
         settlementOutcome = {
           railStatus: 'POLICY_APPROVED_FOR_CAPTURE',
           authStatus: liveAuth.authStatus || 'RECORD_VERIFIED',
-          message: `Evaluation verdict: COMPLIANT_FULFILLMENT. Policy approved full $135.00 capture. (PayPal auth ${order.authorizationId} status: ${liveAuth.authStatus || 'VOIDED'}; capture not dispatched against voided record).`
+          message: `Evaluation verdict: COMPLIANT_FULFILLMENT. Policy approved full $${authorizedCaptureAmount} capture. (PayPal auth ${order.authorizationId} status: ${liveAuth.authStatus || 'VOIDED'}; capture not dispatched against voided record).`
         };
       }
     } catch (e) {
@@ -366,7 +439,18 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 // 4. Ingest Fulfillment Webhook (Interactive UI helper)
 app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
   const { caseId, slipText, proposedPrice, eventType, orderId } = req.body;
-  const order = getOrCreateOrder(orderId || 'default_order');
+  if (!orderId || !ordersRegistry.has(orderId)) {
+    return res.status(404).json({
+      error: 'ORDER_NOT_FOUND: Ingest endpoint requires an existing registered orderId.'
+    });
+  }
+  const order = ordersRegistry.get(orderId);
+
+  if (!order.authorizationId) {
+    return res.status(409).json({
+      error: 'ORDER_NOT_AUTHORIZED: Order has no active PayPal authorization hold.'
+    });
+  }
 
   const aiExtraction = await aiExtractor.extractWarehouseSlipAttributes(slipText, {
     product: order.approvedBaseline.product,
@@ -387,6 +471,8 @@ app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
     lastEvent: null
   };
 
+  const captureAmount = order.authorizedAmount || order.heldAmount || '135.00';
+
   if (eventType === 'CLEAN' && evaluation.verdict === 'COMPLIANT_FULFILLMENT') {
     // Reviewer Priority #3: Real rail verification rather than blind state mutation
     let liveAuthStatus = 'UNKNOWN';
@@ -399,18 +485,18 @@ app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
 
     if (liveAuthStatus === 'AUTHORIZED' || liveAuthStatus === 'CREATED') {
       try {
-        const cap = await paypal.captureAuthorization(order.authorizationId, '135.00', true);
+        const cap = await paypal.captureAuthorization(order.authorizationId, captureAmount, true);
         if (cap.success && cap.captureId) {
           order.financialState = 'CAPTURED';
-          order.capturedAmount = '135.00';
+          order.capturedAmount = captureAmount;
           order.heldAmount = '0.00';
           ledgerUpdate = {
             heldAmount: '0.00',
-            capturedAmount: '135.00',
+            capturedAmount: captureAmount,
             financialState: 'CAPTURED',
             lastEvent: {
               event: 'FULFILLMENT_CAPTURED',
-              desc: `Verified compliant dispatch. Live capture of $135.00 executed on PayPal rails (Capture ID: ${cap.captureId}).`
+              desc: `Verified compliant dispatch. Live capture of $${captureAmount} executed on PayPal rails (Capture ID: ${cap.captureId}).`
             }
           };
         }
@@ -435,7 +521,7 @@ app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
         financialState: 'POLICY_APPROVED_FOR_CAPTURE',
         lastEvent: {
           event: 'POLICY_APPROVED',
-          desc: `Compliant fulfillment verified. Order approved for full $135.00 capture. (PayPal auth ${order.authorizationId} status: ${liveAuthStatus}).`
+          desc: `Compliant fulfillment verified. Order approved for full $${captureAmount} capture. (PayPal auth ${order.authorizationId} status: ${liveAuthStatus}).`
         }
       };
     }
@@ -457,18 +543,42 @@ app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
     aiExtraction,
     evaluation,
     settlementOptions: {
-      discountPrice: proposedPrice || '110.00'
+      discountPrice: proposedPrice || (parseFloat(captureAmount) * 0.8).toFixed(2)
     },
     ledger: ledgerUpdate
   });
 });
 
 // 5. Execute Settlement Action (Void vs Partial Capture)
-// Reviewer Priority #1: Zero False Success. Failed PayPal requests return failure.
+// Enforces strict Order-to-Authorization integrity, rejects unauthorized cross-order settlement,
+// and computes released reserve dynamically from the order's actual authorized amount.
 app.post('/api/orders/settle-action', async (req, res) => {
   const { action, amount, authorizationId, orderId } = req.body;
-  const order = getOrCreateOrder(orderId || 'default_order');
-  const authId = authorizationId || order.authorizationId;
+
+  if (!orderId) {
+    return res.status(400).json({ error: 'Missing required orderId. Settlement must specify an existing order.' });
+  }
+
+  if (!ordersRegistry.has(orderId)) {
+    return res.status(404).json({ error: `ORDER_NOT_FOUND: Order ${orderId} does not exist.` });
+  }
+
+  const order = ordersRegistry.get(orderId);
+
+  if (!order.authorizationId) {
+    return res.status(409).json({
+      error: 'ORDER_NOT_AUTHORIZED: Order does not have an active PayPal authorization on file.'
+    });
+  }
+
+  // Security Integrity: If caller passes authorizationId, strictly verify it matches the order's authorization
+  if (authorizationId && authorizationId !== order.authorizationId) {
+    return res.status(403).json({
+      error: `AUTHORIZATION_MISMATCH: Provided authorizationId '${authorizationId}' does not belong to order '${orderId}'. Settle request rejected.`
+    });
+  }
+
+  const authId = order.authorizationId;
 
   if (action === 'VOID') {
     let isVoidVerified = false;
@@ -540,8 +650,10 @@ app.post('/api/orders/settle-action', async (req, res) => {
     broadcastSSE('SETTLEMENT_EXECUTED', { action: 'VOID', authId, result });
     return res.json(result);
   } else if (action === 'CAPTURE_DISCOUNT') {
-    const targetCapture = amount || '110.00';
-    const released = (135.00 - parseFloat(targetCapture)).toFixed(2);
+    const baselineAuthorized = parseFloat(order.authorizedAmount || order.heldAmount || '135.00');
+    const defaultDiscount = (baselineAuthorized * 0.8).toFixed(2);
+    const targetCapture = amount ? String(parseFloat(amount).toFixed(2)) : defaultDiscount;
+    const released = (baselineAuthorized - parseFloat(targetCapture)).toFixed(2);
 
     let isCaptureSuccessful = false;
     let paypalCaptureId = null;

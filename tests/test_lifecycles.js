@@ -258,6 +258,104 @@ async function runTests() {
       assert.strictEqual(json.result.actionTaken, 'PAYPAL_HOLD_FROZEN_PENDING_BUYER');
     });
 
+    // 5. Final Transaction Integrity & Order-Authorization Security Verification
+    await testAsync('Settlement Security: Rejects settlement request with missing orderId (HTTP 400)', async () => {
+      const res = await fetch(`${baseUrl}/api/orders/settle-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'VOID' })
+      });
+      assert.strictEqual(res.status, 400);
+      const json = await res.json();
+      assert.ok(json.error.includes('Missing required orderId'));
+    });
+
+    await testAsync('Settlement Security: Rejects attempt to settle another order\'s authorization (HTTP 403)', async () => {
+      const res = await fetch(`${baseUrl}/api/orders/settle-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: '36S14862Y66466816',
+          authorizationId: 'SPOOFED_UNAUTHORIZED_AUTH_9999',
+          action: 'VOID'
+        })
+      });
+      assert.strictEqual(res.status, 403);
+      const json = await res.json();
+      assert.ok(json.error.includes('AUTHORIZATION_MISMATCH'));
+    });
+
+    await testAsync('Fulfillment Security: Rejects webhook fulfillment for order with no authorization (HTTP 409)', async () => {
+      // Register a brand new un-authorized order
+      const newOrderPayload = JSON.stringify({
+        product: 'Industrial M12 Stainless Bolts',
+        amount: '250.00',
+        mandateText: 'Grade 316 Marine Stainless Steel'
+      });
+      const createRes = await fetch(`${baseUrl}/api/orders/create-mandate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: newOrderPayload
+      });
+      assert.strictEqual(createRes.status, 201);
+      const createJson = await createRes.json();
+      const newOrderId = createJson.orderId;
+
+      // Now send webhook for this new order before it has been authorized
+      const webhookPayload = JSON.stringify({
+        orderId: newOrderId,
+        slipText: 'PACKING SLIP #8821: Dispatched Grade 316 Stainless Bolts'
+      });
+      const sig = crypto.createHmac('sha256', secret).update(webhookPayload).digest('hex');
+      const hookRes = await fetch(`${baseUrl}/api/webhooks/fulfillment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-TCC-Signature': sig
+        },
+        body: webhookPayload
+      });
+      assert.strictEqual(hookRes.status, 409);
+      const hookJson = await hookRes.json();
+      assert.ok(hookJson.error.includes('ORDER_NOT_AUTHORIZED'));
+    });
+
+    await testAsync('Dynamic Order Integrity: Order authorization binds correctly with non-$135 amount', async () => {
+      // 1. Create a dynamic order for $450.00
+      const createRes = await fetch(`${baseUrl}/api/orders/create-mandate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product: 'Dell PowerEdge ECC Server Memory Kit',
+          amount: '450.00',
+          mandateText: '64GB DDR5 Registered ECC UDIMM'
+        })
+      });
+      assert.strictEqual(createRes.status, 201);
+      const orderData = await createRes.json();
+      const dynOrderId = orderData.orderId;
+
+      // 2. Authorize and bind specific authorization ID
+      const authRes = await fetch(`${baseUrl}/api/orders/authorize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: dynOrderId,
+          authorizationId: 'TEST_AUTH_DYN_450'
+        })
+      });
+      assert.strictEqual(authRes.status, 200);
+      const authJson = await authRes.json();
+      assert.strictEqual(authJson.authorizationId, 'TEST_AUTH_DYN_450');
+      assert.strictEqual(authJson.financialState, 'HOLD_LOCKED');
+      assert.strictEqual(authJson.heldAmount, '450.00');
+
+      // 3. Verify internal registry order integrity
+      const registered = ordersRegistry.get(dynOrderId);
+      assert.strictEqual(registered.authorizedAmount, '450.00');
+      assert.strictEqual(registered.authorizationId, 'TEST_AUTH_DYN_450');
+    });
+
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
