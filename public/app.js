@@ -326,6 +326,11 @@ async function triggerVoidAction() {
     const data = await res.json();
     if (btn) btn.disabled = false;
 
+    if (!data.success) {
+      alert('PayPal Rails Error: ' + (data.error || 'VOID operation failed'));
+      return;
+    }
+
     // Transform Center Vault into VOIDED state
     const nodePaypal = document.getElementById('nodePaypal');
     nodePaypal.classList.remove('state-captured', 'state-frozen', 'state-offer');
@@ -372,6 +377,11 @@ async function triggerAcceptDiscount() {
     });
     const data = await res.json();
     if (btn) btn.disabled = false;
+
+    if (!data.success) {
+      alert('PayPal Rails Rail Gate Enforcement:\n\n' + (data.error || 'Capture not permitted on rails') + '\n\n' + (data.note || ''));
+      return;
+    }
 
     // Transform Center Vault into PARTIAL CAPTURED state
     const nodePaypal = document.getElementById('nodePaypal');

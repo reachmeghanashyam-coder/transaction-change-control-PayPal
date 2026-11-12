@@ -9,7 +9,13 @@ const policyEngine = require('./services/policyEngine');
 const aiExtractor = require('./services/aiExtractor');
 
 const app = express();
-app.use(express.json());
+
+// Capture raw body buffer for authentic cryptographic HMAC verification
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Multi-Tenant Order & Session Registry
@@ -165,12 +171,37 @@ app.get('/api/events', (req, res) => {
 
 // 3. Enterprise Webhook Ingestion Engine (/api/webhooks/fulfillment)
 // Supports Native Shopify ('orders/fulfilled') & ShipBob ('order.shipment.packed') payloads
-// with strict cryptographic HMAC-SHA256 signature verification
+// with strict raw-buffer cryptographic HMAC-SHA256 signature verification
 const WEBHOOK_SECRET = process.env.TCC_WEBHOOK_SECRET || 'whsec_tcc_paypal_sandbox_2026';
 
 app.post('/api/webhooks/fulfillment', async (req, res) => {
   const signature = req.headers['x-tcc-signature'] || req.headers['x-shopify-hmac-sha256'] || req.headers['x-shipbob-signature'];
   const body = req.body;
+
+  // Strict Webhook Authentication (Reviewer Priority #2: Reject unsigned events)
+  if (!signature) {
+    console.warn('[WMS SECURITY REJECTION] Missing webhook cryptographic signature header.');
+    return res.status(401).json({
+      error: 'UNAUTHORIZED: Missing required webhook cryptographic signature header (X-TCC-Signature, X-Shopify-Hmac-Sha256, or X-ShipBob-Signature).'
+    });
+  }
+
+  // Cryptographic HMAC-SHA256 Verification against raw request bytes
+  const rawPayload = req.rawBody || Buffer.from(JSON.stringify(req.body));
+  const expectedHex = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawPayload).digest('hex');
+  const expectedBase64 = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawPayload).digest('base64');
+
+  const sigBuffer = Buffer.from(signature);
+  const hexBuffer = Buffer.from(expectedHex);
+  const b64Buffer = Buffer.from(expectedBase64);
+
+  const isValidHex = sigBuffer.length === hexBuffer.length && crypto.timingSafeEqual(sigBuffer, hexBuffer);
+  const isValidB64 = sigBuffer.length === b64Buffer.length && crypto.timingSafeEqual(sigBuffer, b64Buffer);
+
+  if (!isValidHex && !isValidB64) {
+    console.warn(`[WMS SECURITY REJECTION] Invalid HMAC signature provided: ${signature}`);
+    return res.status(401).json({ error: 'UNAUTHORIZED: Cryptographic HMAC-SHA256 signature verification failed.' });
+  }
 
   // 1. Universal Multi-Platform Payload Normalization:
   // Handles raw slipText OR structured Shopify Fulfillment JSON OR ShipBob ASN JSON
@@ -199,17 +230,8 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
     });
   }
 
-  // Cryptographic HMAC-SHA256 Verification (Gate 7 Defense)
-  if (signature) {
-    const expectedSig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(JSON.stringify(req.body)).digest('hex');
-    if (signature !== expectedSig) {
-      console.warn(`[WMS SECURITY ALERT] Invalid HMAC signature: ${signature}`);
-      return res.status(401).json({ error: 'UNAUTHORIZED: Invalid HMAC-SHA256 signature' });
-    }
-  }
-
   const order = getOrCreateOrder(body.orderId || 'default_order');
-  console.log(`[WMS WEBHOOK RECEIVED] Source: ${warehouseSource} | Tracking: ${trackingId} | Auth: ${signature ? 'HMAC_VERIFIED' : 'LOCAL_CLIENT'}`);
+  console.log(`[WMS WEBHOOK RECEIVED] Source: ${warehouseSource} | Tracking: ${trackingId} | Auth: HMAC_VERIFIED (Strict)`);
 
   // 2. Run AI Extraction with 3-tier resilient failover
   let aiExtraction;
@@ -240,13 +262,48 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 
   const isCompliant = evaluation.verdict === 'COMPLIANT_FULFILLMENT';
 
-  // 3. Update isolated order state
+  // 3. Update isolated order state with verified rail checks (Reviewer Priority #3)
+  let settlementOutcome = null;
+
   if (isCompliant) {
-    order.financialState = 'CAPTURED';
-    order.capturedAmount = '135.00';
-    order.heldAmount = '0.00';
+    // Attempt actual capture if active authorization exists on PayPal rails
+    try {
+      const liveAuth = await paypal.getAuthorization(order.authorizationId);
+      if (liveAuth.success && (liveAuth.authStatus === 'CREATED' || liveAuth.authStatus === 'AUTHORIZED')) {
+        const cap = await paypal.captureAuthorization(order.authorizationId, '135.00', true);
+        if (cap.success && cap.captureId) {
+          order.financialState = 'CAPTURED';
+          order.capturedAmount = '135.00';
+          order.heldAmount = '0.00';
+          settlementOutcome = {
+            railStatus: 'CAPTURED_ON_PAYPAL_RAILS',
+            captureId: cap.captureId,
+            message: `Full capture of $135.00 confirmed on PayPal rails (Capture ID: ${cap.captureId}).`
+          };
+        }
+      } else {
+        // Transparent disclosure: baseline sandbox authorization was previously voided for audit trail
+        order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
+        order.heldAmount = '135.00';
+        settlementOutcome = {
+          railStatus: 'POLICY_APPROVED_FOR_CAPTURE',
+          authStatus: liveAuth.authStatus || 'RECORD_VERIFIED',
+          message: `Evaluation verdict: COMPLIANT_FULFILLMENT. Policy approved full $135.00 capture. (PayPal auth ${order.authorizationId} status: ${liveAuth.authStatus || 'VOIDED'}).`
+        };
+      }
+    } catch (e) {
+      order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
+      settlementOutcome = {
+        railStatus: 'POLICY_APPROVED_FOR_CAPTURE',
+        message: `Evaluation verdict: COMPLIANT_FULFILLMENT. Policy gate approved. Rail verification notice: ${e.message}`
+      };
+    }
   } else {
     order.financialState = 'HOLD_FROZEN';
+    settlementOutcome = {
+      railStatus: 'PAYPAL_HOLD_FROZEN',
+      message: `Specification deviation detected (${aiExtraction.attributes.mandatorySpecStatus}). Funds frozen on PayPal pending buyer consent.`
+    };
   }
 
   const webhookResult = {
@@ -255,7 +312,8 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
     isCompliant,
     evaluation,
     aiExtraction,
-    actionTaken: isCompliant ? 'AUTO_CAPTURE_EXECUTED' : 'PAYPAL_HOLD_FROZEN_PENDING_BUYER',
+    actionTaken: isCompliant ? 'APPROVED_FOR_CAPTURE' : 'PAYPAL_HOLD_FROZEN_PENDING_BUYER',
+    settlementOutcome,
     paypalRails: {
       intent: 'AUTHORIZE',
       authorizationId: order.authorizationId,
@@ -267,6 +325,9 @@ app.post('/api/webhooks/fulfillment', async (req, res) => {
 
   return res.status(200).json({
     success: true,
+    result: webhookResult
+  });
+});
     result: webhookResult
   });
 });
@@ -296,19 +357,57 @@ app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
   };
 
   if (eventType === 'CLEAN' && evaluation.verdict === 'COMPLIANT_FULFILLMENT') {
-    order.financialState = 'CAPTURED';
-    order.capturedAmount = '135.00';
-    order.heldAmount = '0.00';
+    // Reviewer Priority #3: Real rail verification rather than blind state mutation
+    let liveAuthStatus = 'UNKNOWN';
+    try {
+      const authCheck = await paypal.getAuthorization(order.authorizationId);
+      if (authCheck.success) liveAuthStatus = authCheck.authStatus;
+    } catch (e) {
+      console.warn('[INGEST] PayPal auth check warning:', e.message);
+    }
 
-    ledgerUpdate = {
-      heldAmount: '0.00',
-      capturedAmount: '135.00',
-      financialState: 'CAPTURED',
-      lastEvent: {
-        event: 'FULFILLMENT_CAPTURED',
-        desc: `Verified compliant dispatch. Full capture of $135.00 executed on PayPal rails.`
+    if (liveAuthStatus === 'AUTHORIZED' || liveAuthStatus === 'CREATED') {
+      try {
+        const cap = await paypal.captureAuthorization(order.authorizationId, '135.00', true);
+        if (cap.success && cap.captureId) {
+          order.financialState = 'CAPTURED';
+          order.capturedAmount = '135.00';
+          order.heldAmount = '0.00';
+          ledgerUpdate = {
+            heldAmount: '0.00',
+            capturedAmount: '135.00',
+            financialState: 'CAPTURED',
+            lastEvent: {
+              event: 'FULFILLMENT_CAPTURED',
+              desc: `Verified compliant dispatch. Live capture of $135.00 executed on PayPal rails (Capture ID: ${cap.captureId}).`
+            }
+          };
+        }
+      } catch (err) {
+        order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
+        ledgerUpdate = {
+          heldAmount: order.heldAmount,
+          capturedAmount: '0.00',
+          financialState: 'POLICY_APPROVED_FOR_CAPTURE',
+          lastEvent: {
+            event: 'POLICY_APPROVED',
+            desc: `Compliant fulfillment verified. Capture attempted but rail error occurred: ${err.message}`
+          }
+        };
       }
-    };
+    } else {
+      // Baseline authorization was voided as permanent test evidence
+      order.financialState = 'POLICY_APPROVED_FOR_CAPTURE';
+      ledgerUpdate = {
+        heldAmount: order.heldAmount,
+        capturedAmount: '0.00',
+        financialState: 'POLICY_APPROVED_FOR_CAPTURE',
+        lastEvent: {
+          event: 'POLICY_APPROVED',
+          desc: `Compliant fulfillment verified. Order approved for full $135.00 capture. (PayPal auth ${order.authorizationId} status: ${liveAuthStatus}).`
+        }
+      };
+    }
   } else {
     order.financialState = 'HOLD_FROZEN';
     ledgerUpdate = {
@@ -334,31 +433,64 @@ app.post('/api/webhook/fulfillment-ingest', async (req, res) => {
 });
 
 // 5. Execute Settlement Action (Void vs Partial Capture)
+// Reviewer Priority #1: Zero False Success. Failed PayPal requests return failure.
 app.post('/api/orders/settle-action', async (req, res) => {
   const { action, amount, authorizationId, orderId } = req.body;
   const order = getOrCreateOrder(orderId || 'default_order');
   const authId = authorizationId || order.authorizationId;
 
   if (action === 'VOID') {
-    let httpStatus = 204;
-    let isAlreadyVoided = false;
+    let isVoidVerified = false;
+    let httpStatus = 0;
+    let responseDetails = null;
+
     try {
       const v = await paypal.voidAuthorization(authId);
       httpStatus = v.status;
-      if (v.status === 422 && v.raw?.details?.[0]?.issue === 'PREVIOUSLY_VOIDED') {
-        isAlreadyVoided = true;
+      responseDetails = v.raw;
+
+      if (v.status === 200 || v.status === 204) {
+        // Direct successful void from PayPal
+        isVoidVerified = true;
+      } else if (v.status === 422 && v.raw?.details?.[0]?.issue === 'PREVIOUSLY_VOIDED') {
+        // Idempotent retry: verified previously voided
+        isVoidVerified = true;
+      } else {
+        // Query PayPal directly to check actual ledger status
+        const check = await paypal.getAuthorization(authId);
+        if (check.success && check.authStatus === 'VOIDED') {
+          isVoidVerified = true;
+        }
       }
-    } catch (e) {
-      console.log('[SETTLE NOTICE] Void call status check:', e.message);
+    } catch (err) {
+      console.error('[SETTLE ERROR] Void call failed:', err.message);
+      try {
+        const check = await paypal.getAuthorization(authId);
+        if (check.success && check.authStatus === 'VOIDED') {
+          isVoidVerified = true;
+        }
+      } catch (checkErr) {
+        console.error('[SETTLE ERROR] Verification check also failed:', checkErr.message);
+      }
     }
 
+    if (!isVoidVerified) {
+      console.warn(`[SETTLE FAILURE] PayPal void failed for authorization: ${authId}`);
+      return res.status(httpStatus && httpStatus >= 400 ? httpStatus : 502).json({
+        success: false,
+        error: 'PayPal VOID operation failed on payment rails',
+        details: responseDetails,
+        financialState: order.financialState,
+        note: 'Local financial state remains unchanged.'
+      });
+    }
+
+    // Mutate state ONLY after PayPal rails confirm VOIDED
     order.financialState = 'VOIDED';
     order.heldAmount = '0.00';
     order.capturedAmount = '0.00';
 
-    const receiptMsg = isAlreadyVoided
-      ? `Authorization \`${authId}\` verified as VOIDED on PayPal Sandbox ledger. Zero dollars captured ($0.00).`
-      : `Authorization \`${authId}\` VOIDED on PayPal Sandbox (HTTP ${httpStatus}). Zero dollars captured ($0.00).`;
+    const receiptMsg = `Authorization \`${authId}\` verified as VOIDED on PayPal Sandbox ledger. Zero dollars captured ($0.00).`;
 
     const result = {
       success: true,
@@ -369,7 +501,7 @@ app.post('/api/orders/settle-action', async (req, res) => {
         financialState: 'VOIDED',
         lastEvent: {
           event: 'PAYPAL_HOLD_VOIDED',
-          desc: `Authorization ${authId} voided. Captured: $0.00. No funds deducted.`
+          desc: `Authorization ${authId} voided on PayPal rails. Captured: $0.00. No funds deducted.`
         }
       }
     };
@@ -380,36 +512,52 @@ app.post('/api/orders/settle-action', async (req, res) => {
     const targetCapture = amount || '110.00';
     const released = (135.00 - parseFloat(targetCapture)).toFixed(2);
 
-    // Call real PayPal captureAuthorization endpoint
+    let isCaptureSuccessful = false;
     let paypalCaptureId = null;
-    let httpStatus = 201;
+    let httpStatus = 0;
     let captureDetails = null;
 
     try {
       const capResult = await paypal.captureAuthorization(authId, targetCapture, true);
-      if (capResult && capResult.captureId) {
+      httpStatus = capResult.status;
+      captureDetails = capResult.raw;
+
+      if (capResult.success && capResult.captureId) {
+        isCaptureSuccessful = true;
         paypalCaptureId = capResult.captureId;
-        httpStatus = capResult.status || 201;
-        captureDetails = capResult;
-      } else {
-        httpStatus = capResult.status;
-        captureDetails = capResult.raw;
       }
-    } catch (e) {
-      console.log('[SETTLE NOTICE] PayPal capture call note:', e.message);
+    } catch (err) {
+      console.error('[SETTLE ERROR] Capture call threw:', err.message);
     }
 
+    // Reviewer Priority #1: Zero False Success on Capture.
+    // If PayPal fails (e.g. authorization already voided or invalid), FAIL CLOSED.
+    // NEVER manufacture fake AUTH_FINALIZED_ IDs or mark local state CAPTURED.
+    if (!isCaptureSuccessful) {
+      console.warn(`[SETTLE FAILURE] PayPal capture rejected for auth ${authId}:`, captureDetails);
+      const desc = captureDetails?.details?.[0]?.description || captureDetails?.message || 'PayPal capture failed on rails';
+      const issue = captureDetails?.details?.[0]?.issue || 'CAPTURE_REJECTED';
+
+      return res.status(httpStatus && httpStatus >= 400 ? httpStatus : 422).json({
+        success: false,
+        error: `PayPal Capture Rejected: ${desc}`,
+        issue,
+        details: captureDetails,
+        financialState: order.financialState,
+        note: `Payment was NOT captured. Local order remains in state: ${order.financialState}.`
+      });
+    }
+
+    // Mutate state ONLY after PayPal confirms capture
     order.financialState = 'CAPTURED';
     order.heldAmount = '0.00';
     order.capturedAmount = targetCapture;
 
-    const receiptMsg = paypalCaptureId
-      ? `Partial capture of $${targetCapture} executed on PayPal authorization \`${authId}\` (Capture ID: ${paypalCaptureId}). Uncaptured reserve of $${released} released.`
-      : `Partial capture requested on PayPal authorization \`${authId}\` for $${targetCapture} (HTTP ${httpStatus}: ${captureDetails?.details?.[0]?.description || 'Ledger state verified'}). Uncaptured reserve of $${released} released.`;
+    const receiptMsg = `Partial capture of $${targetCapture} confirmed by PayPal authorization \`${authId}\` (Capture ID: ${paypalCaptureId}). Uncaptured reserve of $${released} released.`;
 
     const result = {
       success: true,
-      captureId: paypalCaptureId || `AUTH_FINALIZED_${authId.substring(0, 8)}`,
+      captureId: paypalCaptureId,
       receipt: receiptMsg,
       ledger: {
         heldAmount: '0.00',
@@ -417,7 +565,7 @@ app.post('/api/orders/settle-action', async (req, res) => {
         financialState: 'CAPTURED',
         lastEvent: {
           event: 'PAYPAL_PARTIAL_CAPTURE',
-          desc: `Captured: $${targetCapture}. Uncaptured reserve: $${released} released.`
+          desc: `Captured: $${targetCapture} via PayPal Capture ID ${paypalCaptureId}. Uncaptured reserve: $${released} released.`
         }
       }
     };
