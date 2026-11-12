@@ -122,165 +122,120 @@ async function switchScenario(scenarioId) {
     if (btn) btn.classList.toggle('active', id === scenarioId);
   });
 
-  // Reset stage
-  resetSpatialStage();
+  // Guarantee Box 1 (Buyer Agent) and Box 2 (PayPal Gate) are visible
+  document.getElementById('nodeBuyer').classList.add('node-revealed');
+  const nodePaypal = document.getElementById('nodePaypal');
+  nodePaypal.classList.add('node-revealed');
+  nodePaypal.classList.remove('state-captured', 'state-frozen', 'state-offer', 'state-voided');
 
-  // ACT 1 (0.15s): Buyer mandate is revealed
-  const t1 = setTimeout(() => {
-    document.getElementById('nodeBuyer').classList.add('node-revealed');
-    updateTimelineStep(1, 'completed');
-    updateReplayIndicator('ACT 1 OF 4 · MANDATE LOCKED');
-  }, 150);
-  activeTimeouts.push(t1);
+  // Reset receipts
+  document.getElementById('miniReceipt').style.display = 'none';
 
-  // ACT 2 (0.9s): Rail wire pulse travels from Buyer to PayPal
-  const t2 = setTimeout(() => {
-    const pulse = document.getElementById('pulseLeft');
-    pulse.style.background = 'linear-gradient(90deg, transparent, var(--accent-cyan), #FFFFFF)';
-    pulse.style.boxShadow = '0 0 10px var(--accent-cyan)';
-    pulse.animate([
-      { left: '0%', opacity: 1 },
-      { left: '100%', opacity: 0 }
-    ], { duration: 750, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' });
+  // Animate warehouse inbound pulse (right to center)
+  const pulse = document.getElementById('pulseRight');
+  pulse.style.background = 'linear-gradient(90deg, #FFFFFF, var(--accent-amber), transparent)';
+  pulse.style.boxShadow = '0 0 10px var(--accent-amber)';
+  pulse.animate([
+    { right: '0%', opacity: 1 },
+    { right: '100%', opacity: 0 }
+  ], { duration: 500, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' });
 
-    document.getElementById('labelLeft').style.color = 'var(--accent-cyan)';
-    updateReplayIndicator('ACT 2 OF 4 · ESCROW ROUTING');
-  }, 900);
-  activeTimeouts.push(t2);
+  document.getElementById('labelRight').style.color = scDef.conduitRightColor;
+  updateReplayIndicator('INBOUND WMS WEBHOOK · AUDITING VIA GEMINI 3.5 FLASH...');
 
-  // ACT 3 (1.7s): Center Node reveals, PayPal locks $135 Hold on reserve
-  const t3 = setTimeout(() => {
-    const nodePaypal = document.getElementById('nodePaypal');
-    nodePaypal.classList.add('node-revealed');
+  // Reveal Warehouse Node seamlessly
+  const nodeWh = document.getElementById('nodeWarehouse');
+  nodeWh.classList.add('node-revealed');
+  nodeWh.classList.toggle('node-compliant', scDef.id === 1);
 
-    document.getElementById('vaultAmount').innerText = '135.00';
-    document.getElementById('vaultAmount').className = 'curr-val';
-    document.getElementById('vaultStateBadge').innerText = 'HOLD RESERVED · $0.00 CAPTURED';
-    document.getElementById('vaultStateBadge').className = 'gate-state-badge';
-    document.getElementById('diffPackedVal').innerHTML = '<span class="text-dim">Awaiting Warehouse Feed...</span>';
-    document.getElementById('vaultSubtext').innerText = 'PayPal Orders v2 · intent: AUTHORIZE active. Merchant cannot capture without compliance.';
+  document.getElementById('whShoeImg').src = scDef.whImg;
+  document.getElementById('whGlow').className = scDef.whGlowClass;
+  document.getElementById('whProductName').innerText = scDef.whTitle;
+  document.getElementById('whSubSku').innerText = scDef.whSubSku;
 
-    updateTimelineStep(2, 'completed');
-    updateReplayIndicator('ACT 3 OF 4 · ESCROW SECURED');
-  }, 1700);
-  activeTimeouts.push(t3);
+  const priceVal = document.getElementById('whPriceVal');
+  priceVal.innerHTML = `${scDef.whPrice} <span class="price-curr">USD</span>`;
+  priceVal.className = scDef.whPriceDowngrade ? 'item-price font-mono downgrade' : 'item-price font-mono';
 
-  // ACT 4 (2.5s): Warehouse feed fires rail pulse towards Center & CALLS LIVE SERVER WEBHOOK
-  const t4 = setTimeout(async () => {
-    const pulse = document.getElementById('pulseRight');
-    pulse.style.background = 'linear-gradient(90deg, #FFFFFF, var(--accent-amber), transparent)';
-    pulse.style.boxShadow = '0 0 10px var(--accent-amber)';
-    pulse.animate([
-      { right: '0%', opacity: 1 },
-      { right: '100%', opacity: 0 }
-    ], { duration: 750, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' });
+  const whBadge = document.getElementById('whBadgeText');
+  whBadge.innerText = scDef.whBadgeText;
+  whBadge.className = `spec-v font-semibold ${scDef.whBadgeColor}`;
 
-    document.getElementById('labelRight').style.color = scDef.conduitRightColor;
-    updateReplayIndicator('ACT 3 OF 4 · LIVE GEMINI 3.5 FLASH AUDIT...');
+  const whStatus = document.getElementById('whStatusTag');
+  whStatus.innerText = scDef.whStatusTag;
+  whStatus.className = `node-status-pill ${scDef.whStatusTagClass}`;
 
-    // ACT 5 (Reveal Warehouse Node immediately without waiting on network)
-    const nodeWh = document.getElementById('nodeWarehouse');
-    nodeWh.classList.add('node-revealed');
-    if (scDef.id === 1) nodeWh.classList.add('node-compliant');
+  document.getElementById('whSlipId').innerText = scDef.whSlipId;
+  document.getElementById('diffPackedVal').innerHTML = scDef.diffPackedVal;
+  updateTimelineStep(3, 'completed', scDef.tlStep3Text);
 
-    document.getElementById('whShoeImg').src = scDef.whImg;
-    document.getElementById('whGlow').className = scDef.whGlowClass;
-    document.getElementById('whProductName').innerText = scDef.whTitle;
-    document.getElementById('whSubSku').innerText = scDef.whSubSku;
-    
-    const priceVal = document.getElementById('whPriceVal');
-    priceVal.innerHTML = `${scDef.whPrice} <span class="price-curr">USD</span>`;
-    priceVal.className = scDef.whPriceDowngrade ? 'item-price font-mono downgrade' : 'item-price font-mono';
+  // Asynchronous Gemini Ingestion: UI updates smoothly
+  const auditTextEl = document.getElementById('auditAnalysisText');
+  auditTextEl.innerHTML = '<span class="text-cyan font-mono">Auditing via Gemini 3.5 Flash...</span>';
 
-    const whBadge = document.getElementById('whBadgeText');
-    whBadge.innerText = scDef.whBadgeText;
-    whBadge.className = `spec-v font-semibold ${scDef.whBadgeColor}`;
-    
-    const whStatus = document.getElementById('whStatusTag');
-    whStatus.innerText = scDef.whStatusTag;
-    whStatus.className = `node-status-pill ${scDef.whStatusTagClass}`;
-
-    document.getElementById('whSlipId').innerText = scDef.whSlipId;
-    document.getElementById('diffPackedVal').innerHTML = scDef.diffPackedVal;
-    updateTimelineStep(3, 'completed', scDef.tlStep3Text);
-
-    // Asynchronous Gemini Ingestion: UI never freezes, audits in background
-    const auditTextEl = document.getElementById('auditAnalysisText');
-    auditTextEl.innerHTML = '<span class="text-cyan font-mono">Auditing via Gemini 3.5 Flash...</span>';
-
-    fetch('/api/webhooks/fulfillment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        slipText: scDef.slipText,
-        warehouseId: scDef.whSlipId,
-        packingSlipId: '#4092'
-      })
-    }).then(r => r.json()).then(data => {
-      if (data && data.result && data.result.aiExtraction) {
-        const ai = data.result.aiExtraction;
-        auditTextEl.innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">Gemini 3.5 Flash (${ai.latencyMs}ms):</span> ${ai.attributes.riskExplanation || (scDef.id === 1 ? '✓ Verified Compliant' : '⚠️ Breach Detected')}`;
-      } else {
-        auditTextEl.innerText = scDef.auditAnalysis;
-      }
-    }).catch(() => {
-      auditTextEl.innerText = scDef.auditAnalysis;
-    });
-
-    // ACT 6: Settlement Gate enforces on PayPal Rails
-    const nodePaypal = document.getElementById('nodePaypal');
-    nodePaypal.classList.remove('state-captured', 'state-frozen', 'state-offer', 'state-voided');
-    if (scDef.id === 1) nodePaypal.classList.add('state-captured');
-    else if (scDef.id === 2) nodePaypal.classList.add('state-frozen');
-    else if (scDef.id === 3) nodePaypal.classList.add('state-offer');
-
-    const amt = document.getElementById('vaultAmount');
-    amt.innerText = scDef.id === 3 ? '110.00' : '135.00';
-    amt.className = `curr-val ${scDef.vaultClass}`;
-
-    const badge = document.getElementById('vaultStateBadge');
-    badge.innerText = scDef.vaultBadgeText;
-    badge.className = `gate-state-badge ${scDef.vaultBadgeClass}`;
-
-    document.getElementById('vaultSubtext').innerText = scDef.vaultSubtext;
-
-    // Switch Fixed Action Dock
-    const noteEl = document.getElementById('stateNoteDefault');
-    const btnRow = document.getElementById('buyerBtnRow');
-    const btnVoid = document.getElementById('btnVoid');
-    const btnAccept = document.getElementById('btnAcceptDiscount');
-    const receipt = document.getElementById('miniReceipt');
-
-    receipt.style.display = 'none';
-
-    // Event 2 (Swap Trap): Warehouse attempted full $135 substitution without discount -> Buyer only has Reject & Void ($0.00)
-    // Event 3 ($25 Offer): Warehouse offered $25 amendment -> Buyer can ACCEPT $25 REFUND & CAPTURE $110 or Void
-    if (scDef.id === 2) {
-      noteEl.style.display = 'none';
-      btnRow.style.display = 'flex';
-      btnVoid.style.display = 'flex';
-      btnAccept.style.display = 'none';
-    } else if (scDef.id === 3) {
-      noteEl.style.display = 'none';
-      btnRow.style.display = 'flex';
-      btnVoid.style.display = 'flex';
-      btnAccept.style.display = 'flex';
-      btnAccept.innerHTML = '<span>ACCEPT $25 REFUND & CAPTURE $110</span>';
+  fetch('/api/webhooks/fulfillment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slipText: scDef.slipText,
+      warehouseId: scDef.whSlipId,
+      packingSlipId: '#4092'
+    })
+  }).then(r => r.json()).then(data => {
+    if (data && data.result && data.result.aiExtraction) {
+      const ai = data.result.aiExtraction;
+      auditTextEl.innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">Gemini 3.5 Flash (${ai.latencyMs}ms):</span> ${ai.attributes.riskExplanation || (scDef.id === 1 ? '✓ Verified Compliant' : '⚠️ Breach Detected')}`;
     } else {
-      noteEl.style.display = 'flex';
-      btnRow.style.display = 'none';
+      auditTextEl.innerText = scDef.auditAnalysis;
     }
+  }).catch(() => {
+    auditTextEl.innerText = scDef.auditAnalysis;
+  });
 
-    updateTimelineStep(4, (scDef.showVoidBtn || scDef.showAcceptBtn) ? 'active' : 'completed', scDef.tlStep4Text);
+  // Smooth Settlement Enforcement on Center Vault
+  if (scDef.id === 1) nodePaypal.classList.add('state-captured');
+  else if (scDef.id === 2) nodePaypal.classList.add('state-frozen');
+  else if (scDef.id === 3) nodePaypal.classList.add('state-offer');
 
-    // Update bottom evidence proof drawer
-    document.getElementById('proofStateText').innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">${scDef.proofStatus}</span>`;
-    document.getElementById('proofCapturedVal').innerText = scDef.proofCaptured;
+  const amt = document.getElementById('vaultAmount');
+  amt.innerText = scDef.id === 3 ? '110.00' : '135.00';
+  amt.className = `curr-val ${scDef.vaultClass}`;
 
-    updateReplayIndicator(scDef.replayMeta);
+  const badge = document.getElementById('vaultStateBadge');
+  badge.innerText = scDef.vaultBadgeText;
+  badge.className = `gate-state-badge ${scDef.vaultBadgeClass}`;
 
-  }, 2500);
-  activeTimeouts.push(t4);
+  document.getElementById('vaultSubtext').innerText = scDef.vaultSubtext;
+
+  // Action Dock Controls
+  const noteEl = document.getElementById('stateNoteDefault');
+  const btnRow = document.getElementById('buyerBtnRow');
+  const btnVoid = document.getElementById('btnVoid');
+  const btnAccept = document.getElementById('btnAcceptDiscount');
+
+  if (scDef.id === 2) {
+    noteEl.style.display = 'none';
+    btnRow.style.display = 'flex';
+    btnVoid.style.display = 'flex';
+    btnAccept.style.display = 'none';
+  } else if (scDef.id === 3) {
+    noteEl.style.display = 'none';
+    btnRow.style.display = 'flex';
+    btnVoid.style.display = 'flex';
+    btnAccept.style.display = 'flex';
+    btnAccept.innerHTML = '<span>ACCEPT $25 REFUND & CAPTURE $110</span>';
+  } else {
+    noteEl.style.display = 'flex';
+    btnRow.style.display = 'none';
+  }
+
+  updateTimelineStep(4, (scDef.showVoidBtn || scDef.showAcceptBtn) ? 'active' : 'completed', scDef.tlStep4Text);
+
+  // Update bottom evidence proof drawer
+  document.getElementById('proofStateText').innerHTML = `<span class="${scDef.id === 1 ? 'text-green' : 'text-amber'} font-semibold">${scDef.proofStatus}</span>`;
+  document.getElementById('proofCapturedVal').innerText = scDef.proofCaptured;
+
+  updateReplayIndicator(scDef.replayMeta);
 }
 
 function resetSpatialStage() {
