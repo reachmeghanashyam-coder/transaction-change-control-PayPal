@@ -41,12 +41,13 @@ async function extractWarehouseSlipAttributes(slipText, targetMandate) {
   for (const modelName of candidateModels) {
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const prompt = `You are an automated fulfillment auditing gate for PayPal payment holds.
-Analyze this warehouse packing slip against the buyer's approved purchase mandate.
+      const prompt = `You are an autonomous fulfillment auditing agent for PayPal payment holds.
+Perform multi-step agentic reasoning to audit this warehouse packing slip against the buyer's approved purchase mandate.
 
-CRITICAL REASONING INSTRUCTION:
-Do not rely on simple keyword or exact SKU matching. Real warehouses frequently emit thermal printer shorthand, ambiguous descriptions, or claim "approved equivalent substitutions" (e.g. shipping high-airflow mesh for waterproof running shoes, desktop UDIMM for ECC server RAM, or zinc-coated fasteners for marine stainless steel).
-Perform physical material and semantic specification reasoning to determine whether the physical attributes described in the warehouse slip genuinely satisfy the buyer's non-negotiable contract invariants.
+EXECUTION PIPELINE:
+1. ENTITY EXTRACTION: Parse the unstructured packing slip text to identify the actual item dispatched, any thermal shorthand (e.g. "Peg4 Rd Ed"), and pricing.
+2. MATERIAL REASONING: Compare the physical material properties of the dispatched item against the buyer's non-negotiable contract invariants (e.g., evaluating whether an "Open-Hole Mesh Upper" or "Road Edition" can physically fulfill a "100% GORE-TEX Waterproof" specification).
+3. POLICY SYNTHESIS: Decide whether the spec is PRESENT, ABSENT, or UNKNOWN, and provide a clear justification.
 
 BUYER MANDATE:
 - Item: ${targetMandate.product}
@@ -56,14 +57,18 @@ BUYER MANDATE:
 WAREHOUSE PACKING SLIP:
 "${slipText}"
 
-Determine if the mandatory spec is PRESENT (certified), ABSENT (materially missing/different/incompatible), or UNKNOWN (ambiguous/unverified substitution).
 Respond in pure JSON matching this exact structure:
 {
   "shippedItem": "item name found in slip",
   "shippedPrice": "price found or N/A",
   "mandatorySpecStatus": "PRESENT or ABSENT or UNKNOWN",
-  "citations": ["quote from slip demonstrating the physical or material attribute"],
-  "semanticReasoning": "detailed 1-sentence physical material reasoning explaining why the shipped specification satisfies or breaches the contract",
+  "materialReasoningChain": [
+    "Step 1: Dispatched item identified as ...",
+    "Step 2: Material properties evaluated ...",
+    "Step 3: Contract invariant compliance evaluated ..."
+  ],
+  "citations": ["quote from slip demonstrating physical attribute"],
+  "semanticReasoning": "1-sentence physical material reasoning explaining why the specification satisfies or breaches the contract",
   "riskExplanation": "short 1-sentence risk summary",
   "confidenceScore": 0.95
 }`;
@@ -95,7 +100,9 @@ Respond in pure JSON matching this exact structure:
           shippedItem: parsed.shippedItem || 'Dispatched Item',
           shippedPrice: parsed.shippedPrice || targetMandate.maxPrice,
           mandatorySpecStatus: parsed.mandatorySpecStatus || 'UNKNOWN',
+          materialReasoningChain: parsed.materialReasoningChain || [],
           citations: parsed.citations || [],
+          semanticReasoning: parsed.semanticReasoning || '',
           riskExplanation: parsed.riskExplanation || '',
           confidenceScore: parsed.confidenceScore || 0.95
         }
