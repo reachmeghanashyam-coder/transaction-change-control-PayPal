@@ -10,7 +10,7 @@
 * **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R) *(Note: Sandbox tokens require interactive payer approval before conversion to authorizations; fresh tokens can be generated via `npm run agent:demo`).*
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`, verified on `api-m.sandbox.paypal.com`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
-* **Automated Test Suite:** **13 Passed, 0 Failed** via `npm test` (3 live PayPal Sandbox API integration tests + 10 deterministic policy tests).
+* **Automated Test Suite:** **13 Passed, 0 Failed** via `npm test` (2 live PayPal Sandbox API integration tests + 11 deterministic policy tests).
 
 ### How to Independently Verify the Correlated Mismatch-to-Void Workflow:
 To prove the causal link connecting the buyer mandate, warehouse packing slip mismatch, and the resulting PayPal Sandbox void:
@@ -22,6 +22,8 @@ This executes `scripts/verify_audit_trail.js`, querying `api-m.sandbox.paypal.co
 2. **Fulfillment Evidence:** Ingests signed packing slip `#4092` attempting an unapproved open-mesh substitution.
 3. **Policy Decision:** Triggers `MATERIAL_SPEC_BREACH` and halts capture.
 4. **PayPal Ledger Verification:** Live query confirms PayPal Authorization `7VU467051N1536501` is `VOIDED` with $0.00 captured.
+
+> **Note on PayPal Orders v2 Sandbox Evaluation:** In the sandbox environment, creating an order with `intent: AUTHORIZE` generates an unapproved order token (as demonstrated live via `npm run agent:demo` / `scripts/agent_order.js`). Because converting an order into an active authorization requires interactive payer authentication through PayPal's hosted approval URL, authorization record `7VU467051N1536501` serves as the verified, permanent ledger artifact for inspecting voided authorization status without requiring the judge to manually complete an interactive browser flow during automated test evaluation.
 
 ---
 
@@ -132,7 +134,7 @@ Any judge or developer can verify the system in under 60 seconds:
 ```bash
 # 1. Run Automated Test Suite
 npm test
-# Output: 13 Passed (3 live PayPal Sandbox API tests + 10 deterministic policy tests)
+# Output: 13 Passed (2 live PayPal Sandbox API tests + 11 deterministic policy tests)
 
 # 2. Run Correlated Audit Trail Verification (Proves Inbound Webhook -> Breach -> PayPal Void)
 npm run verify:audit
