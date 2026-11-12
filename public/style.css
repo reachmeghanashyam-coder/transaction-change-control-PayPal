@@ -1309,3 +1309,23 @@ body::before {
   background: rgba(16, 185, 129, 0.12) !important;
   border: 1px solid rgba(16, 185, 129, 0.5) !important;
 }
+
+/* Prominent PayPal Cyan Hold Badge */
+.gate-state-badge.badge-hold {
+  background: rgba(0, 121, 193, 0.20) !important;
+  border: 1px solid rgba(56, 189, 248, 0.65) !important;
+  color: #38BDF8 !important;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+}
+
+.amount-hero-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #38BDF8;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}

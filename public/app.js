@@ -448,8 +448,8 @@ function initPreDispatchHoldState() {
   amt.className = 'curr-val';
 
   const badge = document.getElementById('vaultStateBadge');
-  badge.innerText = 'STATUS: HOLD RESERVED · $0.00 CAPTURED';
-  badge.className = 'gate-state-badge';
+  badge.innerText = '🔒 STATUS: HOLD ARMED · $0.00 CAPTURED';
+  badge.className = 'gate-state-badge badge-hold';
 
   document.getElementById('vaultSubtext').innerText = 'PayPal Orders v2 · intent: AUTHORIZE active. Funds reserved. Awaiting inbound warehouse event.';
   document.getElementById('diffPackedVal').innerHTML = '<span class="text-cyan font-mono">Awaiting Inbound Warehouse Event...</span>';
