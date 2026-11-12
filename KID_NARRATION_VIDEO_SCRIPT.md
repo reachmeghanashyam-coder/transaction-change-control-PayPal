@@ -42,7 +42,7 @@
 ---
 
 ### ACT 4: The Universal Why & Proof (1:05 – 1:20)
-* **Visual:** Click **JUDGE EVIDENCE VAULT** in bottom drawer (showing `13/13 TESTS PASSING` and real PayPal API IDs). Cut to terminal running `npm test` showing 13 passing tests.
+* **Visual:** Click **JUDGE EVIDENCE VAULT** in bottom drawer (showing `14/14 TESTS PASSING` and real PayPal API IDs). Cut to terminal running `npm test` showing 14 passing tests.
 * **Voiceover:**
 > *"Why does this matter?  
 > Because in a world where autonomous AI agents spend money without human supervision, trust cannot end at checkout.  

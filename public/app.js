@@ -253,13 +253,19 @@ async function switchScenario(scenarioId) {
 
     receipt.style.display = 'none';
 
-    // Allow sovereign buyer freedom on both breach scenarios (Reject OR Settle)
-    if (scDef.id === 2 || scDef.id === 3) {
+    // Event 2 (Swap Trap): Warehouse attempted full $135 substitution without discount -> Buyer only has Reject & Void ($0.00)
+    // Event 3 ($25 Offer): Warehouse offered $25 amendment -> Buyer can ACCEPT $25 REFUND & CAPTURE $110 or Void
+    if (scDef.id === 2) {
+      noteEl.style.display = 'none';
+      btnRow.style.display = 'flex';
+      btnVoid.style.display = 'flex';
+      btnAccept.style.display = 'none';
+    } else if (scDef.id === 3) {
       noteEl.style.display = 'none';
       btnRow.style.display = 'flex';
       btnVoid.style.display = 'flex';
       btnAccept.style.display = 'flex';
-      btnAccept.innerText = scDef.id === 2 ? 'Accept Mesh at $110.00' : 'Accept Mesh for $110.00';
+      btnAccept.innerHTML = '<span>ACCEPT $25 REFUND & CAPTURE $110</span>';
     } else {
       noteEl.style.display = 'flex';
       btnRow.style.display = 'none';
