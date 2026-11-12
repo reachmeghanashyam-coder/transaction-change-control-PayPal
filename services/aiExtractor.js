@@ -44,6 +44,10 @@ async function extractWarehouseSlipAttributes(slipText, targetMandate) {
       const prompt = `You are an automated fulfillment auditing gate for PayPal payment holds.
 Analyze this warehouse packing slip against the buyer's approved purchase mandate.
 
+CRITICAL REASONING INSTRUCTION:
+Do not rely on simple keyword or exact SKU matching. Real warehouses frequently emit thermal printer shorthand, ambiguous descriptions, or claim "approved equivalent substitutions" (e.g. shipping high-airflow mesh for waterproof running shoes, desktop UDIMM for ECC server RAM, or zinc-coated fasteners for marine stainless steel).
+Perform physical material and semantic specification reasoning to determine whether the physical attributes described in the warehouse slip genuinely satisfy the buyer's non-negotiable contract invariants.
+
 BUYER MANDATE:
 - Item: ${targetMandate.product}
 - Mandatory Spec: ${targetMandate.mandateText}
@@ -52,13 +56,14 @@ BUYER MANDATE:
 WAREHOUSE PACKING SLIP:
 "${slipText}"
 
-Determine if the mandatory spec is PRESENT (certified), ABSENT (missing/different), or UNKNOWN (ambiguous/substituted).
+Determine if the mandatory spec is PRESENT (certified), ABSENT (materially missing/different/incompatible), or UNKNOWN (ambiguous/unverified substitution).
 Respond in pure JSON matching this exact structure:
 {
   "shippedItem": "item name found in slip",
   "shippedPrice": "price found or N/A",
   "mandatorySpecStatus": "PRESENT or ABSENT or UNKNOWN",
-  "citations": ["quote from slip"],
+  "citations": ["quote from slip demonstrating the physical or material attribute"],
+  "semanticReasoning": "detailed 1-sentence physical material reasoning explaining why the shipped specification satisfies or breaches the contract",
   "riskExplanation": "short 1-sentence risk summary",
   "confidenceScore": 0.95
 }`;
