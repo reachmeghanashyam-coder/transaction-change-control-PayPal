@@ -429,8 +429,48 @@ function toggleProofDrawer() {
 }
 
 // Initial Boot: Scenario 1
+
+function initPreDispatchHoldState() {
+  clearOrchestratorTimeouts();
+  resetSpatialStage();
+
+  // Reveal Buyer Mandate (Left)
+  document.getElementById('nodeBuyer').classList.add('node-revealed');
+  updateTimelineStep(1, 'completed');
+
+  // Reveal Center PayPal Vault in Hold Pending Fulfillment state
+  const nodePaypal = document.getElementById('nodePaypal');
+  nodePaypal.classList.add('node-revealed');
+  nodePaypal.classList.remove('state-captured', 'state-frozen', 'state-offer', 'state-voided');
+
+  const amt = document.getElementById('vaultAmount');
+  amt.innerText = '135.00';
+  amt.className = 'curr-val';
+
+  const badge = document.getElementById('vaultStateBadge');
+  badge.innerText = 'STATUS: HOLD RESERVED · $0.00 CAPTURED';
+  badge.className = 'gate-state-badge';
+
+  document.getElementById('vaultSubtext').innerText = 'PayPal Orders v2 · intent: AUTHORIZE active. Funds reserved. Awaiting inbound warehouse event.';
+  document.getElementById('diffPackedVal').innerHTML = '<span class="text-cyan font-mono">Awaiting Inbound Warehouse Event...</span>';
+
+  updateTimelineStep(2, 'completed');
+  updateReplayIndicator('PRE-DISPATCH HOLD ARMED · SELECT WAREHOUSE EVENT ABOVE');
+
+  // Ensure buttons are not pre-selected on initial cold load
+  [1, 2, 3].forEach(id => {
+    const btn = document.getElementById(`seg${id}`);
+    if (btn) btn.classList.remove('active');
+  });
+
+  // Keep right warehouse card dimmed until an event button is clicked
+  const nodeWh = document.getElementById('nodeWarehouse');
+  nodeWh.classList.remove('node-revealed', 'node-compliant');
+  document.getElementById('auditAnalysisText').innerHTML = '<span class="text-dim font-mono">Awaiting warehouse dispatch...</span>';
+}
+
 window.addEventListener('load', () => {
-  switchScenario(1);
+  initPreDispatchHoldState();
 });
 
 
