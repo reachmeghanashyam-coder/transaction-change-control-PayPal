@@ -135,7 +135,7 @@ Any judge or developer can verify the system in under 60 seconds:
 ```bash
 # 1. Run Automated Test Suite
 npm test
-# Output: 13 Passed (2 live PayPal Sandbox API tests + 11 deterministic policy tests)
+# Output: 14 Passed (2 live PayPal Sandbox API tests + 11 deterministic policy tests)
 
 # 2. Run Correlated Audit Trail Verification (Proves Inbound Webhook -> Breach -> PayPal Void)
 npm run verify:audit
