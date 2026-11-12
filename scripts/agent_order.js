@@ -9,18 +9,13 @@ async function main() {
   console.log('   Budget:  $135.00 USD Max (Zero Unilateral Substitution Allowed)');
   console.log('   Rails:   PayPal Orders v2 (intent: AUTHORIZE)');
 
-  try {
-    const order = await paypal.createOrder({
-      amount: '135.00',
-      description: 'TCC Protected: Nike Pegasus Trail 4 GORE-TEX (Size 10 US)'
-    });
+  const order = await paypal.createOrder({
+    amount: '135.00',
+    description: 'TCC Protected: Nike Pegasus Trail 4 GORE-TEX (Size 10 US)'
+  });
 
-    console.log(`   Order:   ${order.orderId} -> Escrow Hold Armed ($135.00)`);
-    console.log(`   Status:  HOLD_PENDING_FULFILLMENT ($0.00 Captured)\n`);
-  } catch {
-    console.log(`   Order:   0YF63190UJ204352P -> Escrow Hold Armed ($135.00)`);
-    console.log(`   Status:  HOLD_PENDING_FULFILLMENT ($0.00 Captured)\n`);
-  }
+  console.log(`   Order:   ${order.orderId} -> Authorization Hold Pending ($135.00)`);
+  console.log(`   Status:  HOLD_PENDING_FULFILLMENT ($0.00 Captured)\n`);
 }
 
 main();
