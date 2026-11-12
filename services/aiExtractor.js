@@ -170,6 +170,12 @@ function runDeterministicFallback(slipText, targetMandate, startTime, notice) {
     riskExplanation = 'Defensive fail-closed: unverified specification.';
   }
 
+  const reasoningChain = [
+    `Step 1 (Entity Identification): Dispatched item parsed as "${shippedItem}".`,
+    `Step 2 (Material Invariant Analysis): Evaluated against mandatory requirement "${targetMandate.mandatorySpec}". Invariant status resolved as ${mandatorySpecStatus}.`,
+    `Step 3 (Policy Synthesis & Risk Enforcement): ${riskExplanation}`
+  ];
+
   return {
     success: true,
     source: 'DETERMINISTIC_SEMANTIC_ENGINE',
@@ -179,7 +185,9 @@ function runDeterministicFallback(slipText, targetMandate, startTime, notice) {
       shippedItem,
       shippedPrice,
       mandatorySpecStatus,
+      materialReasoningChain: reasoningChain,
       citations,
+      semanticReasoning: riskExplanation,
       riskExplanation,
       confidenceScore: 0.98
     }

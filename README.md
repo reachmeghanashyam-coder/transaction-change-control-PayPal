@@ -7,10 +7,11 @@
 
 ## Live Sandbox Execution & Correlated Verification
 
+* **Live Hosted Instance (Render):** [https://tcc-paypal.onrender.com](https://tcc-paypal.onrender.com) *(Hosted on Render Free Tier. If cold, please allow ~25 seconds for initial instance spin-up).*
 * **Live PayPal Sandbox Checkout Token:** [https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R](https://www.sandbox.paypal.com/checkoutnow?token=3UD04688N2031870R) *(Note: Sandbox tokens require interactive payer approval before conversion to authorizations; fresh tokens can be generated via `npm run agent:demo`).*
 * **Verified Ledger Authorization Record:** `7VU467051N1536501` (`status: "VOIDED"`, `amount: "135.00 USD"`, verified on `api-m.sandbox.paypal.com`)
 * **Payee Merchant ID:** `9QY2YH5UFLKTJ` (`sb-zh47io53822863@business.example.com`)
-* **Automated Test Suite:** **13 Passed, 0 Failed** via `npm test` (2 live PayPal Sandbox API integration tests + 11 deterministic policy tests).
+* **Automated Test Suite:** **14 Passed, 0 Failed** via `npm test` (2 live PayPal Sandbox API integration tests + 12 deterministic/agentic policy tests).
 
 ### How to Independently Verify the Correlated Mismatch-to-Void Workflow:
 To prove the causal link connecting the buyer mandate, warehouse packing slip mismatch, and the resulting PayPal Sandbox void:

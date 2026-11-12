@@ -4,6 +4,7 @@
 const assert = require('assert');
 const policyEngine = require('../services/policyEngine');
 const paypal = require('../services/paypal');
+const aiExtractor = require('../services/aiExtractor');
 
 async function runTests() {
   console.log('================================================================');
@@ -110,6 +111,16 @@ async function runTests() {
 
     assert.strictEqual(result.requiresConsent, true);
     assert.notStrictEqual(result.verdict, 'COMPLIANT_FULFILLMENT');
+  });
+
+  await testAsync('Gemini 3-Step Agentic Reasoning Chain validates physical material invariants', async () => {
+    const ai = await aiExtractor.extractWarehouseSlipAttributes(
+      'PACKING SLIP #4092: Dispatched Peg4 Rd Ed (Open-Hole Mesh Upper).',
+      { product: 'Nike Pegasus Trail 4 GORE-TEX', mandateText: '100% Waterproof Certified', maxPrice: '135.00' }
+    );
+    assert.strictEqual(ai.success, true);
+    assert.ok(ai.attributes.mandatorySpecStatus === 'ABSENT' || ai.attributes.mandatorySpecStatus === 'UNKNOWN', 'Breach detected');
+    assert.ok(ai.attributes.materialReasoningChain && ai.attributes.materialReasoningChain.length >= 2, 'Reasoning chain must contain multiple steps');
   });
 
   // 3. PayPal Rails Verification

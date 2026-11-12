@@ -529,16 +529,6 @@ app.listen(PORT, () => {
   console.log(`   API Docs:    http://localhost:${PORT}/docs       `);
   console.log(`====================================================`);
 
-  // Active Keep-Warm Mechanism for Cloud Container (prevents cold starts during judging)
-  const baseUrl = process.env.BASE_URL;
-  if (baseUrl && baseUrl.includes('onrender.com')) {
-    console.log(`[KEEP-WARM] Scheduling self-ping every 8 minutes for ${baseUrl}...`);
-    setInterval(async () => {
-      try {
-        await fetch(`${baseUrl}/health`);
-      } catch (e) {
-        // Ignore background ping errors
-      }
-    }, 8 * 60 * 1000);
-  }
+  // Render Free-Tier preservation: Natural sleep mode enabled to conserve compute hours through Dec 22.
+  // Render automatically boots on incoming requests without exhausting monthly allocations.
 });
